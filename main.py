@@ -8,14 +8,14 @@ from processor import GraphPreprocessor, NODE_TYPE_CNT
 from network import Embedding
 from socket import *
 
-HIDDEN = 512
+from args import HIDDEN, device
 
 if __name__ == '__main__':
     RLserver = socket(AF_INET, SOCK_DGRAM)
     RLserver.bind(('', 2021))
 
-    embedder = Embedding(NODE_TYPE_CNT + 2, hidden_dim=HIDDEN)
-    actor = nn.Linear(HIDDEN, 1)
+    embedder = Embedding(NODE_TYPE_CNT + 2, hidden_dim=HIDDEN, edges_type_cnt=180)
+    actor = nn.Linear(HIDDEN, 1).to(device)
     # critic = nn.Sequential(nn.Linear(HIDDEN, HIDDEN), nn.ReLU(), nn.Linear(HIDDEN, 1))
 
     models = nn.ModuleList([embedder, actor])

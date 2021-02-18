@@ -1,9 +1,10 @@
 import torch
 
 from processor import GraphPreprocessor
+from args import device
 
 def pretrain(embedder, actor, optimizer) -> None:
-    g = GraphPreprocessor("train/cons", "train/goal", "train/in")
+    g = GraphPreprocessor("train/cons", "train/goal", "train/in", device)
     '''
     graph_embedding = embedder(g)
     with open("embedding", "w") as f:
@@ -24,7 +25,7 @@ def pretrain(embedder, actor, optimizer) -> None:
             break
 
         loss = torch.nn.CrossEntropyLoss()
-        output = loss(v.reshape(1, -1), torch.tensor([answer_idx]))
+        output = loss(v.reshape(1, -1), torch.tensor([answer_idx]).to(device))
         print("loss", output.item())
         optimizer.zero_grad()
         output.backward()

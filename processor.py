@@ -12,11 +12,11 @@ def get_or_add(d: Dict, key):
     return d[key]
 
 class GraphPreprocessor(object):
-    def __init__(self, cons_name: str, goal_name: str, in_name: str):
+    def __init__(self, cons_name: str, goal_name: str, in_name: str, device):
         self.node_cnt = 0
         self.nodes: List[str] = []
-        edges_type: List[List[int]] = []
-        nodes_type: List[List[int]] = []
+        edges_type: List[int] = []
+        nodes_type: List[int] = []
         self.node_dict:Dict[str, int] = {}
 
 
@@ -47,7 +47,7 @@ class GraphPreprocessor(object):
                         self.node_cnt += 1
                         nodes_type.append(NODE_TYPE_DICT[term.split("(")[0]])
 
-        self.node_fea = torch.zeros((self.node_cnt, NODE_TYPE_CNT + 2), dtype=torch.float32)
+        self.node_fea = torch.zeros((self.node_cnt, NODE_TYPE_CNT + 2), dtype=torch.float32, device=device)
 
         for line in cons:
             for term in line:
@@ -71,6 +71,6 @@ class GraphPreprocessor(object):
                 edges.append((head_idx, tail_idx))
                 edges_type.append(get_or_add(edge_dict, (head_type, tail_type)))
 
-        self.edges = torch.tensor(edges, dtype=torch.int64).T
-        self.nodes_type = torch.tensor(nodes_type)
-        self.edges_type = torch.tensor(edges_type)
+        self.edges = torch.tensor(edges, dtype=torch.int64, device=device).T
+        self.nodes_type = torch.tensor(nodes_type, device=device)
+        self.edges_type = torch.tensor(edges_type, device=device)

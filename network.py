@@ -7,6 +7,7 @@ from torch.nn import Linear, Parameter, ParameterList, Module
 from torch_geometric.nn import MessagePassing
 from processor import NODE_TYPE_DICT, NODE_TYPE_CNT
 
+from args import device
 from typing import List
 
 class LinearList(Module):
@@ -19,11 +20,11 @@ class LinearList(Module):
         super(LinearList, self).__init__()
         self.in_features = in_features
         self.out_features = out_features
-        self.weights = ParameterList([Parameter(torch.Tensor(out_features, in_features)) for i in range(size)])
+        self.weights = ParameterList([Parameter(torch.Tensor(out_features, in_features)) for i in range(size)]).to(device)
         if bias:
-            self.biases = ParameterList([Parameter(torch.Tensor(out_features)) for i in range(size)])
+            self.biases = ParameterList([Parameter(torch.Tensor(out_features)) for i in range(size)]).to(device)
         else:
-            self.biases = ParameterList([None for i in range(size)])
+            self.biases = ParameterList([None for i in range(size)]).to(device)
         self.reset_parameters()
 
     def reset_parameters(self) -> None:
@@ -44,9 +45,9 @@ class LinearList(Module):
         )
 
 class GCNConv(MessagePassing):
-    def __init__(self, in_channels, hidden_channels, out_channels):
+    def __init__(self, in_channels, hidden_channels, out_channels, edges_type_cnt):
         super(GCNConv, self).__init__(aggr='add')  # "Add" aggregation (Step 5).
-        self.passing = LinearList(in_channels, out_channels, 8 * NODE_TYPE_CNT, bias=False)
+        self.passing = LinearList(in_channels, out_channels, edges_type_cnt, bias=False)
         self.updating = LinearList(in_channels + hidden_channels, out_channels, NODE_TYPE_CNT, bias=False)
 
     def forward(self, x, edge_index, nodes_type, edges_type):
@@ -60,10 +61,10 @@ class GCNConv(MessagePassing):
         return self.passing(x_j, edges_type)
 
 class Embedding(torch.nn.Module):
-    def __init__(self, feature_cnt: int, hidden_dim = 128):
+    def __init__(self, feature_cnt: int, edges_type_cnt, hidden_dim = 128):
         super(Embedding, self).__init__()
         self.conv_input = LinearList(feature_cnt, hidden_dim, NODE_TYPE_CNT)
-        self.conv_passing = GCNConv(hidden_dim, hidden_dim, hidden_dim)
+        self.conv_passing = GCNConv(hidden_dim, hidden_dim, hidden_dim, edges_type_cnt)
 
     def forward(self, data):
         x, nodes_type, edges = data.node_fea, data.nodes_type, data.edges
