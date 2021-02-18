@@ -15,7 +15,7 @@ if __name__ == '__main__':
     RLserver.bind(('', 2021))
 
     embedder = Embedding(NODE_TYPE_CNT + 2, hidden_dim=HIDDEN, edges_type_cnt=180)
-    actor = nn.Linear(HIDDEN, 1).to(device)
+    actor = nn.Sequential(nn.Linear(HIDDEN, HIDDEN), nn.ReLU(), nn.Linear(HIDDEN, 1)).to(device)
     # critic = nn.Sequential(nn.Linear(HIDDEN, HIDDEN), nn.ReLU(), nn.Linear(HIDDEN, 1))
 
     models = nn.ModuleList([embedder, actor])
