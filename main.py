@@ -1,3 +1,5 @@
+import os
+
 import torch
 import torch.nn as nn
 import torch.optim as optim
@@ -6,9 +8,9 @@ from utils import pretrain
 
 from processor import GraphPreprocessor, NODE_TYPE_CNT
 from network import Embedding
-from socket import *
+from socket import socket, AF_INET, SOCK_DGRAM
 
-from args import HIDDEN, device
+from args import HIDDEN, device, MODEL_DIR
 
 if __name__ == '__main__':
     RLserver = socket(AF_INET, SOCK_DGRAM)
@@ -19,12 +21,18 @@ if __name__ == '__main__':
     # critic = nn.Sequential(nn.Linear(HIDDEN, HIDDEN), nn.ReLU(), nn.Linear(HIDDEN, 1))
 
     models = nn.ModuleList([embedder, actor])
-    optimizer = optim.SGD(models.parameters(), lr = 1e-2) #, momentum=0.5)
+    optimizer = optim.Adam(models.parameters(), lr = 5e-3) #, momentum=0.5)
     try:
-        checkpoint = torch.load("models/model.pth")
-        embedder.load_state_dict(checkpoint)
+        checkpoint = torch.load(os.path.join(MODEL_DIR, 'model.pth'))
+        models.load_state_dict(checkpoint)
     except FileNotFoundError as e:
         pretrain(embedder, actor, optimizer)
+        print("pretrain finished")
+        save_dir = MODEL_DIR
+        if not os.path.exists(save_dir):
+            os.makedirs(save_dir)
+        state_dict = models.get_state_dict()
+        torch.save(state_dict, os.path.join(MODEL_DIR, 'model.pth'))
 
     query_cnt = 0
     while True:
@@ -65,4 +73,5 @@ if __name__ == '__main__':
 
             with open("ans", "w") as f:
                 f.write(g.nodes[g.invoke_sites[target]])
+                print(g.nodes[g.invoke_sites[target]])
             RLserver.sendto("SOLVED".encode(), clientAddress)
