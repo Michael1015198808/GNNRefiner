@@ -5,7 +5,7 @@ import torch.nn.functional as F
 from torch import Tensor
 from torch.nn import Linear, Parameter, ParameterList, Module
 from torch_geometric.nn import MessagePassing
-from processor import NODE_TYPE_DICT, NODE_TYPE_CNT, GraphPreprocessor
+from processor import NODES_TYPE_DICT, NODES_TYPE_CNT, GraphPreprocessor
 
 from args import device
 from typing import List
@@ -48,7 +48,7 @@ class GCNConv(MessagePassing):
     def __init__(self, in_channels, hidden_channels, out_channels, edges_type_cnt):
         super(GCNConv, self).__init__(aggr='add')  # "Add" aggregation (Step 5).
         self.passing = LinearList(in_channels, out_channels, edges_type_cnt, bias=False)
-        self.updating = LinearList(in_channels + hidden_channels, out_channels, NODE_TYPE_CNT, bias=False)
+        self.updating = LinearList(in_channels + hidden_channels, out_channels, NODES_TYPE_CNT, bias=False)
 
     def forward(self, x, edge_index, nodes_type, edges_type):
         # x has shape [nodes, HIDDEN]
@@ -67,13 +67,13 @@ class GCNConv(MessagePassing):
 class Embedding(torch.nn.Module):
     def __init__(self, feature_cnt: int, edges_type_cnt: int, hidden_dim = 128):
         super(Embedding, self).__init__()
-        self.conv_input = LinearList(feature_cnt, hidden_dim, NODE_TYPE_CNT)
+        self.conv_input = LinearList(feature_cnt, hidden_dim, NODES_TYPE_CNT)
         # [n, feature_cnt] -> [n, hidden_dim]
         self.conv_passing = GCNConv(hidden_dim, hidden_dim, hidden_dim, edges_type_cnt)
         # [n, hidden_dim] -> [n, hidden_dim]
 
     def forward(self, data: GraphPreprocessor):
-        x, nodes_type, edges = data.node_fea, data.nodes_type, data.edges
+        x, nodes_type, edges = data.nodes_fea, data.nodes_type, data.edges
         # x has shape [nodes, NODE_TYPE_CNT + 2]
 
         # Change point-wise one-hot data into inner representation

@@ -1,10 +1,17 @@
-import json
-import torch
+import os
 from typing import List, Tuple, Dict
 
-with open("node_type_dict", "r") as f:
-    NODE_TYPE_DICT: Dict[str, int] = json.load(f)
-    NODE_TYPE_CNT = len(NODE_TYPE_DICT)
+import json
+import torch
+from args import analysis
+
+with open(os.path.join("data", analysis, "nodes_type_dict"), "r") as f:
+    NODES_TYPE_DICT: Dict[str, int] = json.load(f)
+    NODES_TYPE_CNT = len(NODES_TYPE_DICT)
+
+with open(os.path.join("data", analysis, "edges_type_dict"), "r") as f:
+    EDGES_TYPE_DICT: Dict[str, int] = json.load(f)
+    EDGES_TYPE_CNT = len(EDGES_TYPE_DICT)
 
 def get_or_add(d: Dict, key):
     if key not in d:
@@ -13,11 +20,11 @@ def get_or_add(d: Dict, key):
 
 class GraphPreprocessor(object):
     def __init__(self, cons_name: str, goal_name: str, in_name: str, device):
-        self.node_cnt = 0
+        self.nodes_cnt = 0
         self.nodes: List[str] = []
         edges_type: List[int] = []
         nodes_type: List[int] = []
-        self.node_dict:Dict[str, int] = {}
+        self.nodes_dict:Dict[str, int] = {}
 
 
         edges: List[Tuple[int, int]] = []
@@ -33,7 +40,7 @@ class GraphPreprocessor(object):
             for line in f.read().splitlines():
                 self.goal_set.add(line)
 
-        edge_dict = {}
+        edges_dict = {}
         cons = []
         with open(cons_name, 'r') as f:
             for line in f:
@@ -41,40 +48,40 @@ class GraphPreprocessor(object):
                 head, tail = line.split(":=")
                 cons.append([head, *tail.split("*")])
                 for term in [head, *tail.split("*")]:
-                    if term not in self.node_dict:
-                        self.node_dict[term] = self.node_cnt
+                    if term not in self.nodes_dict:
+                        self.nodes_dict[term] = self.nodes_cnt
                         self.nodes.append(term)
-                        self.node_cnt += 1
-                        nodes_type.append(NODE_TYPE_DICT[term.split("(")[0]])
+                        self.nodes_cnt += 1
+                        nodes_type.append(NODES_TYPE_DICT[term.split("(")[0]])
 
-        self.node_fea = torch.zeros((self.node_cnt, NODE_TYPE_CNT + 2), dtype=torch.float32, device=device)
+        self.nodes_fea = torch.zeros((self.nodes_cnt, NODES_TYPE_CNT + 2), dtype=torch.float32, device=device)
 
         for line in cons:
             for term in line:
-                term_idx = self.node_dict[term]
+                term_idx = self.nodes_dict[term]
                 term_type, _ = term.split("(")
-                self.node_fea[term_idx][NODE_TYPE_DICT[term_type]] = 1
+                self.nodes_fea[term_idx][NODES_TYPE_DICT[term_type]] = 1
                 if term in self.in_set:
-                    self.node_fea[term_idx][NODE_TYPE_CNT] = 1
+                    self.nodes_fea[term_idx][NODES_TYPE_CNT] = 1
                     self.invoke_sites.append(term_idx)
                 elif term in self.goal_set:
-                    self.node_fea[term_idx][NODE_TYPE_CNT + 1] = 1
+                    self.nodes_fea[term_idx][NODES_TYPE_CNT + 1] = 1
 
             head, *tails = line
-            head_idx = self.node_dict[head]
-            head_type = NODE_TYPE_DICT[head.split("(")[0]]
+            head_idx = self.nodes_dict[head]
+            head_type = NODES_TYPE_DICT[head.split("(")[0]]
             for tail in tails:
-                tail_idx = self.node_dict[tail]
-                tail_type = NODE_TYPE_DICT[tail.split("(")[0]]
+                tail_idx = self.nodes_dict[tail]
+                tail_type = NODES_TYPE_DICT[tail.split("(")[0]]
                 edges.append((tail_idx, head_idx))
-                edges_type.append(get_or_add(edge_dict, (tail_type, head_type, 0)))
+                edges_type.append(get_or_add(edges_dict, (tail_type, head_type, 0)))
                 edges.append((head_idx, tail_idx))
-                edges_type.append(get_or_add(edge_dict, (tail_type, head_type, 1)))
+                edges_type.append(get_or_add(edges_dict, (tail_type, head_type, 1)))
 
         self.edges = torch.tensor(edges, dtype=torch.int64, device=device).T
         self.nodes_type = torch.tensor(nodes_type, device=device)
         self.edges_type = torch.tensor(edges_type, device=device)
-        print(self.node_cnt, "nodes.")
-        print(NODE_TYPE_CNT, "types of nodes.")
+        print(self.nodes_cnt, "nodes.")
+        print(NODES_TYPE_CNT, "types of nodes.")
         print(len(edges), "edges.")
-        print(len(edge_dict), "types of edges.")
+        print(len(edges_dict), "types of edges.")
