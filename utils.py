@@ -5,12 +5,7 @@ from args import device
 
 def pretrain(embedder, actor, optimizer) -> None:
     g = GraphPreprocessor("train/cons", "train/goal", "train/in", device)
-    '''
-    graph_embedding = embedder(g)
-    with open("embedding", "w") as f:
-        for i, t in enumerate(graph_embedding):
-            print(g.nodes[i], t, file=f)
-    '''
+    loss = torch.nn.CrossEntropyLoss()
 
     while True:
         graph_embedding = embedder(g)
@@ -22,9 +17,8 @@ def pretrain(embedder, actor, optimizer) -> None:
         print("prob", prob[answer_idx].item())
         print(prob.max().item(), prob.min().item())
         if prob[answer_idx] > 0.5:
-            break
+            return
 
-        loss = torch.nn.CrossEntropyLoss()
         output = loss(v.reshape(1, -1), torch.tensor([answer_idx]).to(device))
         print("loss", output.item())
         optimizer.zero_grad()

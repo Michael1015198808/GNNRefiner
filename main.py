@@ -2,7 +2,6 @@ import os
 
 import torch
 import torch.nn as nn
-import torch.optim as optim
 import numpy as np
 from utils import pretrain
 
@@ -21,7 +20,7 @@ if __name__ == '__main__':
     # critic = nn.Sequential(nn.Linear(HIDDEN, HIDDEN), nn.ReLU(), nn.Linear(HIDDEN, 1))
 
     models = nn.ModuleList([embedder, actor])
-    optimizer = optim.Adam(models.parameters(), lr = 5e-3) #, momentum=0.5)
+    optimizer = torch.optim.Adam(models.parameters(), lr = 5e-3) #, momentum=0.5)
     try:
         checkpoint = torch.load(os.path.join(MODEL_DIR, 'model.pth'))
         models.load_state_dict(checkpoint)
