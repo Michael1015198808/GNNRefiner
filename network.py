@@ -5,7 +5,7 @@ import torch.nn.functional as F
 from torch import Tensor
 from torch.nn import Linear, Parameter, ParameterList, Module
 from torch_geometric.nn import MessagePassing
-from processor import NODE_TYPE_DICT, NODE_TYPE_CNT
+from processor import NODE_TYPE_DICT, NODE_TYPE_CNT, GraphPreprocessor
 
 from args import device
 from typing import List
@@ -51,26 +51,34 @@ class GCNConv(MessagePassing):
         self.updating = LinearList(in_channels + hidden_channels, out_channels, NODE_TYPE_CNT, bias=False)
 
     def forward(self, x, edge_index, nodes_type, edges_type):
-        # x has shape [N, in_channels]
+        # x has shape [nodes, HIDDEN]
         # edge_index has shape [2, E]
 
-        mid = self.propagate(edge_index, x=x, edges_type=edges_type)
+        # Calculate massage to pass
+        mid = torch.relu(self.propagate(edge_index, x=x, edges_type=edges_type))
+        # mid has shape [nodes, HIDDEN]
+
+        # Updating nodes' states using previous states(x) and current messages(mid).
         return self.updating(torch.cat([x, mid], dim = 1), nodes_type)
 
     def message(self, x_j: Tensor, edges_type: Tensor) -> Tensor:
         return self.passing(x_j, edges_type)
 
 class Embedding(torch.nn.Module):
-    def __init__(self, feature_cnt: int, edges_type_cnt, hidden_dim = 128):
+    def __init__(self, feature_cnt: int, edges_type_cnt: int, hidden_dim = 128):
         super(Embedding, self).__init__()
         self.conv_input = LinearList(feature_cnt, hidden_dim, NODE_TYPE_CNT)
+        # [n, feature_cnt] -> [n, hidden_dim]
         self.conv_passing = GCNConv(hidden_dim, hidden_dim, hidden_dim, edges_type_cnt)
+        # [n, hidden_dim] -> [n, hidden_dim]
 
-    def forward(self, data):
+    def forward(self, data: GraphPreprocessor):
         x, nodes_type, edges = data.node_fea, data.nodes_type, data.edges
+        # x has shape [nodes, NODE_TYPE_CNT + 2]
 
-        # Change point-wise data into hidden dimension
+        # Change point-wise one-hot data into inner representation
         x = torch.relu(self.conv_input(x, nodes_type))
+        # x has shape [nodes, HIDDEN]
 
         # Message Passing
         for _ in range(10):

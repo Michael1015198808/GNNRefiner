@@ -9,7 +9,9 @@ def pretrain(embedder, actor, optimizer) -> None:
 
     while True:
         graph_embedding = embedder(g)
+        # [nodes, HIDDEN]
         v = actor(graph_embedding)[g.invoke_sites]
+        # [invoke_sites, 1]
         prob = torch.softmax(v, dim=0)
         answer = g.node_dict["DenyI(5,1)"]
         answer_idx = g.invoke_sites.index(answer)
