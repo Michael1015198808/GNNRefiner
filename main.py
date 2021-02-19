@@ -45,7 +45,7 @@ if __name__ == '__main__':
             print("Try to solve!")
             assert message == "SOLVING"
 
-            g = GraphPreprocessor("cons", "goal", "in")
+            g = GraphPreprocessor("cons", "goal", "in", device)
 
             # Policy Gradient
             if query_cnt == 0:
