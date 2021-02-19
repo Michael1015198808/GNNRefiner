@@ -74,3 +74,7 @@ class GraphPreprocessor(object):
         self.edges = torch.tensor(edges, dtype=torch.int64, device=device).T
         self.nodes_type = torch.tensor(nodes_type, device=device)
         self.edges_type = torch.tensor(edges_type, device=device)
+        print(self.node_cnt, "nodes.")
+        print(NODE_TYPE_CNT, "types of nodes.")
+        print(len(edges), "edges.")
+        print(len(edge_dict), "types of edges.")
