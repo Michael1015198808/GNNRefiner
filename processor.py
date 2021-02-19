@@ -67,9 +67,9 @@ class GraphPreprocessor(object):
                 tail_idx = self.node_dict[tail]
                 tail_type = NODE_TYPE_DICT[tail.split("(")[0]]
                 edges.append((tail_idx, head_idx))
-                edges_type.append(get_or_add(edge_dict, (tail_type, head_type)))
+                edges_type.append(get_or_add(edge_dict, (tail_type, head_type, 0)))
                 edges.append((head_idx, tail_idx))
-                edges_type.append(get_or_add(edge_dict, (head_type, tail_type)))
+                edges_type.append(get_or_add(edge_dict, (tail_type, head_type, 1)))
 
         self.edges = torch.tensor(edges, dtype=torch.int64, device=device).T
         self.nodes_type = torch.tensor(nodes_type, device=device)
