@@ -3,9 +3,9 @@ import math
 import torch
 import torch.nn.functional as F
 from torch import Tensor
-from torch.nn import Linear, Parameter, ParameterList, Module
+from torch.nn import Parameter, ParameterList, Module
 from torch_geometric.nn import MessagePassing
-from processor import NODES_TYPE_DICT, NODES_TYPE_CNT, GraphPreprocessor
+from processor import NODES_TYPE_CNT, GraphPreprocessor
 
 from args import device
 from typing import List

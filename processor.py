@@ -1,17 +1,7 @@
-import os
 from typing import List, Tuple, Dict
 
-import json
 import torch
-from args import analysis
-
-with open(os.path.join("data", analysis, "nodes_type_dict"), "r") as f:
-    NODES_TYPE_DICT: Dict[str, int] = json.load(f)
-    NODES_TYPE_CNT = len(NODES_TYPE_DICT)
-
-with open(os.path.join("data", analysis, "edges_type_dict"), "r") as f:
-    EDGES_TYPE_DICT: Dict[str, int] = json.load(f)
-    EDGES_TYPE_CNT = len(EDGES_TYPE_DICT)
+from args import NODES_TYPE_DICT, NODES_TYPE_CNT, EDGES_TYPE_DICT, EDGES_TYPE_CNT
 
 class GraphPreprocessor(object):
     def __init__(self, cons_name: str, goal_name: str, in_name: str, device):
