@@ -13,11 +13,6 @@ with open(os.path.join("data", analysis, "edges_type_dict"), "r") as f:
     EDGES_TYPE_DICT: Dict[str, int] = json.load(f)
     EDGES_TYPE_CNT = len(EDGES_TYPE_DICT)
 
-def get_or_add(d: Dict, key):
-    if key not in d:
-        d[key] = len(d)
-    return d[key]
-
 class GraphPreprocessor(object):
     def __init__(self, cons_name: str, goal_name: str, in_name: str, device):
         self.nodes_cnt = 0
@@ -25,7 +20,6 @@ class GraphPreprocessor(object):
         edges_type: List[int] = []
         nodes_type: List[int] = []
         self.nodes_dict:Dict[str, int] = {}
-
 
         edges: List[Tuple[int, int]] = []
 
@@ -40,7 +34,6 @@ class GraphPreprocessor(object):
             for line in f.read().splitlines():
                 self.goal_set.add(line)
 
-        edges_dict = {}
         cons = []
         with open(cons_name, 'r') as f:
             for line in f:
