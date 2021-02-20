@@ -23,8 +23,11 @@ if __name__ == '__main__':
     optimizer = torch.optim.Adam(models.parameters(), lr = 5e-3) #, momentum=0.5)
     try:
         checkpoint = torch.load(os.path.join(MODEL_DIR, 'model.pth'))
+        print("Pretrained model file found. Start with pretrained model")
         models.load_state_dict(checkpoint)
     except FileNotFoundError as e:
+        print("Pretrained model file not found. Start with a random model")
+        print("pretrain started")
         pretrain(embedder, actor, optimizer)
         print("pretrain finished")
         save_dir = MODEL_DIR
@@ -33,6 +36,7 @@ if __name__ == '__main__':
         state_dict = models.state_dict()
         torch.save(state_dict, os.path.join(MODEL_DIR, 'model.pth'))
 
+    exit(0)
     query_cnt = 0
     while True:
         raw_message, clientAddress = RLserver.recvfrom(2048)
