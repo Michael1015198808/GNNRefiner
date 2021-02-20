@@ -1,6 +1,13 @@
 # The code is derived from https://github.com/github/gitignore/blob/master/Python.gitignore
 
 # Project-wised
+ans
+cons
+goal
+in
+
+# IDEs
+.idea
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
