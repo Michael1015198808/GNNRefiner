@@ -30,7 +30,7 @@ if __name__ == '__main__':
         save_dir = MODEL_DIR
         if not os.path.exists(save_dir):
             os.makedirs(save_dir)
-        state_dict = models.get_state_dict()
+        state_dict = models.state_dict()
         torch.save(state_dict, os.path.join(MODEL_DIR, 'model.pth'))
 
     query_cnt = 0
