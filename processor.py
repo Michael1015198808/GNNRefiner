@@ -69,19 +69,17 @@ class GraphPreprocessor(object):
 
             head, *tails = line
             head_idx = self.nodes_dict[head]
-            head_type = NODES_TYPE_DICT[head.split("(")[0]]
+            head_type = head.split("(")[0]
             for tail in tails:
                 tail_idx = self.nodes_dict[tail]
-                tail_type = NODES_TYPE_DICT[tail.split("(")[0]]
+                tail_type = tail.split("(")[0]
                 edges.append((tail_idx, head_idx))
-                edges_type.append(get_or_add(edges_dict, (tail_type, head_type, 0)))
+                edges_type.append(EDGES_TYPE_DICT[tail_type + ">" + head_type])
                 edges.append((head_idx, tail_idx))
-                edges_type.append(get_or_add(edges_dict, (tail_type, head_type, 1)))
+                edges_type.append(EDGES_TYPE_DICT[tail_type + "<" + head_type])
 
         self.edges = torch.tensor(edges, dtype=torch.int64, device=device).T
         self.nodes_type = torch.tensor(nodes_type, device=device)
         self.edges_type = torch.tensor(edges_type, device=device)
         print(self.nodes_cnt, "nodes.")
-        print(NODES_TYPE_CNT, "types of nodes.")
         print(len(edges), "edges.")
-        print(len(edges_dict), "types of edges.")
