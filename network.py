@@ -48,7 +48,8 @@ class GCNConv(MessagePassing):
     def __init__(self, in_channels, hidden_channels, out_channels, edges_type_cnt):
         super(GCNConv, self).__init__(aggr='add')  # "Add" aggregation (Step 5).
         self.passing = LinearList(in_channels, out_channels, edges_type_cnt, bias=False)
-        self.updating = LinearList(in_channels + hidden_channels, out_channels, NODES_TYPE_CNT, bias=False)
+        self.updating1 = LinearList(in_channels + hidden_channels, in_channels + hidden_channels, NODES_TYPE_CNT)
+        self.updating2 = LinearList(in_channels + hidden_channels, out_channels, NODES_TYPE_CNT, bias=False)
 
     def forward(self, x, edge_index, nodes_type, edges_type):
         # x has shape [nodes, HIDDEN]
@@ -59,7 +60,8 @@ class GCNConv(MessagePassing):
         # mid has shape [nodes, HIDDEN]
 
         # Updating nodes' states using previous states(x) and current messages(mid).
-        return self.updating(torch.cat([x, mid], dim = 1), nodes_type)
+        x =  torch.relu(self.updating1(torch.cat([x, mid], dim = 1), nodes_type))
+        return self.updating2(x, nodes_type)
 
     def message(self, x_j: Tensor, edges_type: Tensor) -> Tensor:
         return self.passing(x_j, edges_type)

@@ -17,7 +17,7 @@ if __name__ == '__main__':
     actor = nn.Sequential(nn.Linear(HIDDEN, HIDDEN), nn.ReLU(), nn.Linear(HIDDEN, 1)).to(device)
     # critic = nn.Sequential(nn.Linear(HIDDEN, HIDDEN), nn.ReLU(), nn.Linear(HIDDEN, 1))
     models = nn.ModuleList([embedder, actor])
-    optimizer = torch.optim.Adam(models.parameters(), lr = 5e-3) #, momentum=0.5)
+    optimizer = torch.optim.Adam(models.parameters(), lr = 5e-4) #, momentum=0.5)
 
     try:
         checkpoint = torch.load(os.path.join(MODEL_DIR, 'model.pth'))
