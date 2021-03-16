@@ -3,75 +3,40 @@ import math
 import torch
 import torch.nn.functional as F
 from torch import Tensor
-from torch.nn import Parameter, ParameterList, Module
-from torch_geometric.nn import MessagePassing
+from torch.nn import Linear, Parameter, ParameterList, Module
 from processor import NODES_TYPE_CNT, GraphPreprocessor
+
+import dgl
+from dgl.nn.pytorch import RelGraphConv
 
 from args import device
 from typing import List
 
-class LinearList(Module):
-    __constants__ = ['in_features', 'out_features']
-    in_features: int
-    out_features: int
-    weights: ParameterList
-
-    def __init__(self, in_features: int, out_features: int, size: int, bias: bool = True) -> None:
-        super(LinearList, self).__init__()
-        self.in_features = in_features
-        self.out_features = out_features
-        self.weights = ParameterList([Parameter(torch.Tensor(out_features, in_features)) for i in range(size)]).to(device)
-        if bias:
-            self.biases = ParameterList([Parameter(torch.Tensor(out_features)) for i in range(size)]).to(device)
-        else:
-            self.biases = ParameterList([None for i in range(size)]).to(device)
-        self.reset_parameters()
-
-    def reset_parameters(self) -> None:
-        for weight, bias in zip(self.weights, self.biases):
-            torch.nn.init.kaiming_uniform_(weight, a=math.sqrt(5))
-            if bias != None:
-                fan_in, _ = torch.nn.init._calculate_fan_in_and_fan_out(weight)
-                bound = 1 / math.sqrt(fan_in)
-                torch.nn.init.uniform_(bias, -bound, bound)
-
-    def forward(self, inputs: Tensor, nodes_type: List[int]) -> Tensor:
-        result = [F.linear(input, self.weights[node_type], self.biases[node_type]) for input, node_type in zip(inputs, nodes_type)]
-        return torch.stack(result)
-
-    def extra_repr(self) -> str:
-        return 'in_features={}, out_features={}, bias={}'.format(
-            self.in_features, self.out_features, self.biases[0] is not None
-        )
-
-class GCNConv(MessagePassing):
+class GCNConv(Module):
     def __init__(self, in_channels, hidden_channels, out_channels, edges_type_cnt):
-        super(GCNConv, self).__init__(aggr='add')  # "Add" aggregation (Step 5).
-        self.passing = LinearList(in_channels, out_channels, edges_type_cnt, bias=False)
-        self.updating1 = LinearList(in_channels + hidden_channels, in_channels + hidden_channels, NODES_TYPE_CNT)
-        self.updating2 = LinearList(in_channels + hidden_channels, out_channels, NODES_TYPE_CNT, bias=False)
+        super(GCNConv, self).__init__()
+        self.passing = RelGraphConv(in_channels, out_channels, edges_type_cnt)
+        self.updating1 = Linear(in_channels + hidden_channels, in_channels + hidden_channels)
+        self.updating2 = Linear(in_channels + hidden_channels, out_channels)
 
-    def forward(self, x, edge_index, nodes_type, edges_type):
+    def forward(self, g, x, edges_type):
         # x has shape [nodes, HIDDEN]
         # edge_index has shape [2, E]
 
         # Calculate massage to pass
-        mid = torch.relu(self.propagate(edge_index, x=x, edges_type=edges_type))
+        mid = self.passing(g, x, edges_type)
         # mid has shape [nodes, HIDDEN]
 
         # Updating nodes' states using previous states(x) and current messages(mid).
-        x =  torch.relu(self.updating1(torch.cat([x, mid], dim = 1), nodes_type))
-        return self.updating2(x, nodes_type)
-
-    def message(self, x_j: Tensor, edges_type: Tensor) -> Tensor:
-        return self.passing(x_j, edges_type)
+        x = torch.relu(self.updating1(torch.cat([x, mid], dim = 1)))
+        return self.updating2(x)
 
 class Embedding(torch.nn.Module):
     def __init__(self, feature_cnt: int, edges_type_cnt: int, hidden_dim = 128):
         super(Embedding, self).__init__()
-        self.conv_input = LinearList(feature_cnt, hidden_dim, NODES_TYPE_CNT)
+        self.conv_input = Linear(feature_cnt, hidden_dim).to(device)
         # [n, feature_cnt] -> [n, hidden_dim]
-        self.conv_passing = GCNConv(hidden_dim, hidden_dim, hidden_dim, edges_type_cnt)
+        self.conv_passing = [GCNConv(hidden_dim, hidden_dim, hidden_dim, edges_type_cnt).to(device) for _ in range(10)]
         # [n, hidden_dim] -> [n, hidden_dim]
 
     def forward(self, data: GraphPreprocessor):
@@ -79,12 +44,14 @@ class Embedding(torch.nn.Module):
         # x has shape [nodes, NODE_TYPE_CNT + 2]
 
         # Change point-wise one-hot data into inner representation
-        x = torch.relu(self.conv_input(x, nodes_type))
+        x = torch.relu(self.conv_input(x))
         # x has shape [nodes, HIDDEN]
 
+        g = dgl.graph((data.edges[0], data.edges[1]))
+
         # Message Passing
-        for _ in range(10):
-            x = torch.relu(self.conv_passing(x, edges, nodes_type, data.edges_type))
+        for layer in self.conv_passing:
+            x = torch.relu(layer(g, x, data.edges_type))
 
         return x
 
