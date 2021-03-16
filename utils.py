@@ -1,43 +1,39 @@
+import os
+
 import torch
 
 from processor import GraphPreprocessor
 from args import device
 
 def pretrain(embedder, actor, optimizer) -> None:
-    test_x = torch.zeros((2, 32), dtype=torch.float32).to(device)
-    test_x[0][0] = test_x[1][1] = 1.0
-    test_nodes_type = [0, 1]
-    test_edges_type = [1]
-    test_edge_index = torch.tensor([[0], [1]], dtype=torch.int64).to(device)
-    g = GraphPreprocessor("train/cons", "train/goal", "train/in", device)
-    loss = torch.nn.CrossEntropyLoss()
-    probs = []
+    graphs = []
+    answers = []
+    for train_data in os.listdir("train"):
+        graphs.append(GraphPreprocessor(os.path.join("train", train_data, "cons"),
+                                        os.path.join("train", train_data, "goal"),
+                                        os.path.join("train", train_data, "in"),
+                                        device))
+        with open(os.path.join("train", train_data, "ans"), "r") as f:
+            answers.append([line.strip() for line in f])
+    loss = torch.nn.MSELoss()
 
     while True:
-        graph_embedding = embedder(g)
-        # [nodes, HIDDEN]
-        v = actor(graph_embedding)[g.invoke_sites]
-        # [invoke_sites, 1]
-        prob = torch.softmax(v, dim=0)
-        answer = g.nodes_dict["DenyI(5,1)"]
-        answer_idx = g.invoke_sites.index(answer)
+        for g, answer in zip(graphs, answers):
+            graph_embedding = embedder(g)
+            # [nodes, HIDDEN]
+            v = actor(graph_embedding)[g.invoke_sites]
+            # [invoke_sites, 1]
+            prob = torch.softmax(v, dim=0)
+            ans_tensor = torch.zeros_like(prob)
+            for ans in answer:
+                answer_idx = g.invoke_sites.index(g.nodes_dict[ans])
+                ans_tensor[answer_idx] = 1.0
+                print("prob", prob[answer_idx].item())
+                if prob[answer_idx] > 0.6:
+                    return
 
-        print("prob", prob[answer_idx].item())
-        probs.append(prob[answer_idx].item())
-        print(prob.max().item(), prob.min().item())
-        if prob[answer_idx] > 0.5:
-            import matplotlib.pyplot as plt
-            import json
-            with open("learning_rate.json", "r") as f:
-                lr = json.load(f)
-            with open("learning_rate.json", "w") as f:
-                lr["2 layers"] = probs
-            plt.plot(probs)
-            plt.savefig("prob.jpg")
-            return
-
-        output = loss(v.reshape(1, -1), torch.tensor([answer_idx]).to(device))
-        print("loss", output.item())
-        optimizer.zero_grad()
-        output.backward()
-        optimizer.step()
+            output = loss(prob, ans_tensor)
+            print("loss", output.item())
+            optimizer.zero_grad()
+            output.backward()
+            optimizer.step()
