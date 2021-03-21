@@ -14,10 +14,10 @@ from args import HIDDEN, device, MODEL_DIR, EDGES_TYPE_CNT
 if __name__ == '__main__':
     # networks
     embedder = Embedding(NODES_TYPE_CNT + 2, hidden_dim=HIDDEN, edges_type_cnt=EDGES_TYPE_CNT)
-    actor = nn.Sequential(nn.Linear(HIDDEN, HIDDEN), nn.ReLU(), nn.Linear(HIDDEN, 1)).to(device)
+    actor = nn.Sequential(nn.Linear(HIDDEN, HIDDEN), nn.ReLU(), nn.Linear(HIDDEN, 1), nn.Sigmoid()).to(device)
     # critic = nn.Sequential(nn.Linear(HIDDEN, HIDDEN), nn.ReLU(), nn.Linear(HIDDEN, 1))
     models = nn.ModuleList([embedder, actor])
-    optimizer = torch.optim.Adam(models.parameters(), lr = 5e-4) #, momentum=0.5)
+    optimizer = torch.optim.Adam(models.parameters(), lr = 1e-3) #, momentum=0.5)
 
     try:
         checkpoint = torch.load(os.path.join(MODEL_DIR, 'model.pth'))
@@ -33,7 +33,6 @@ if __name__ == '__main__':
         state_dict = models.state_dict()
         torch.save(state_dict, os.path.join(MODEL_DIR, 'model.pth'))
 
-    exit(0)
     RLserver = socket(AF_INET, SOCK_DGRAM)
     RLserver.bind(('', 2021))
     query_cnt = 0
