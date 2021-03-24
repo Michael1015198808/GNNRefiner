@@ -4,7 +4,8 @@ import torch
 from args import NODES_TYPE_DICT, NODES_TYPE_CNT, EDGES_TYPE_DICT, EDGES_TYPE_CNT
 
 class GraphPreprocessor(object):
-    def __init__(self, cons_name: str, goal_name: str, in_name: str, device):
+    def __init__(self, cons_name: str, goal_name: str, in_name: str, device, graph_name = None):
+        self.graph_name = graph_name
         self.nodes_cnt = 0
         self.nodes: List[str] = []
         edges_type: List[int] = []
@@ -64,5 +65,7 @@ class GraphPreprocessor(object):
         self.edges = torch.tensor(edges, dtype=torch.int64, device=device).T
         self.nodes_type = torch.tensor(nodes_type, device=device)
         self.edges_type = torch.tensor(edges_type, device=device)
+        if self.graph_name:
+            print(self.graph_name)
         print(self.nodes_cnt, "nodes.")
         print(len(edges), "edges.")

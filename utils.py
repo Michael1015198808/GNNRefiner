@@ -13,7 +13,8 @@ def pretrain(embedder, actor, optimizer) -> None:
         graphs.append(GraphPreprocessor(os.path.join("train", train_data, "cons"),
                                         os.path.join("train", train_data, "goal"),
                                         os.path.join("train", train_data, "in"),
-                                        device))
+                                        device,
+                                        train_data))
         with open(os.path.join("train", train_data, "ans"), "r") as f:
             answers.append([line.strip() for line in f])
     print("Training data loaded")
