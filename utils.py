@@ -27,12 +27,13 @@ def pretrain(embedder, actor, optimizer) -> None:
             v = actor(graph_embedding)[g.invoke_sites]
             # [invoke_sites, 1]
             ans_tensor = torch.zeros_like(v)
+            weight = len(g.in_set) / len(answer)
             for ans in answer:
                 answer_idx = g.invoke_sites.index(g.nodes_dict[ans])
                 ans_tensor[answer_idx] = 1.0
                 print("prob", "%.5f" % v[answer_idx].item(), end=" ")
-            weight_tensor = (ans_tensor * 9999) + 1
-            output += (weight_tensor * (v - ans_tensor) ** 2).sum()
+            weight_tensor = (ans_tensor * weight) + 1
+            output += (weight_tensor * (v - ans_tensor) ** 2).mean()
 
         print("loss", output.item())
         if output.item() < 0.1:
