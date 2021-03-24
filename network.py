@@ -15,7 +15,7 @@ from typing import List
 class GCNConv(Module):
     def __init__(self, in_channels, hidden_channels, out_channels, edges_type_cnt):
         super(GCNConv, self).__init__()
-        self.passing = RelGraphConv(in_channels, out_channels, edges_type_cnt)
+        self.passing = RelGraphConv(in_channels, out_channels, edges_type_cnt, low_mem=True)
         self.updating1 = Linear(in_channels + hidden_channels, in_channels + hidden_channels)
         self.updating2 = Linear(in_channels + hidden_channels, out_channels)
 
@@ -32,11 +32,17 @@ class GCNConv(Module):
         return self.updating2(x)
 
 class Embedding(torch.nn.Module):
-    def __init__(self, feature_cnt: int, edges_type_cnt: int, hidden_dim = 128):
+    def __init__(self, feature_cnt: int, edges_type_cnt: int, hidden_dim = 128, layer_dependent : bool = True):
         super(Embedding, self).__init__()
         self.conv_input = Linear(feature_cnt, hidden_dim).to(device)
         # [n, feature_cnt] -> [n, hidden_dim]
-        self.conv_passing = [GCNConv(hidden_dim, hidden_dim, hidden_dim, edges_type_cnt).to(device) for _ in range(10)]
+        self.layer_dependent = layer_dependent
+        if layer_dependent:
+            self.conv_passing = [
+                GCNConv(hidden_dim, hidden_dim, hidden_dim, edges_type_cnt).to(device)
+                for _ in range(10)]
+        else:
+            self.conv_passing = GCNConv(hidden_dim, hidden_dim, hidden_dim, edges_type_cnt).to(device)
         # [n, hidden_dim] -> [n, hidden_dim]
 
     def forward(self, data: GraphPreprocessor):
@@ -50,8 +56,12 @@ class Embedding(torch.nn.Module):
         g = dgl.graph((data.edges[0], data.edges[1]))
 
         # Message Passing
-        for layer in self.conv_passing:
-            x = torch.relu(layer(g, x, data.edges_type))
+        if self.layer_dependent:
+            for layer in self.conv_passing:
+                x = torch.relu(layer(g, x, data.edges_type))
+        else:
+            for i in range(10):
+                x = torch.relu(self.conv_passing(g, x, data.edges_type))
 
         return x
 
