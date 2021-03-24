@@ -1,27 +1,29 @@
 import os
+from os.path import join
 
 import torch
 
 from processor import GraphPreprocessor
-from args import device
+import args
 
 def pretrain(embedder, actor, optimizer) -> None:
     graphs = []
     answers = []
     print("Loading training data")
-    for train_data in os.listdir("train"):
-        graphs.append(GraphPreprocessor(os.path.join("train", train_data, "cons"),
-                                        os.path.join("train", train_data, "goal"),
-                                        os.path.join("train", train_data, "in"),
-                                        device,
+    TRAIN_SET_DIR = join("train", args.analysis)
+    for train_data in os.listdir(TRAIN_SET_DIR):
+        graphs.append(GraphPreprocessor(join(TRAIN_SET_DIR, train_data, "cons"),
+                                        join(TRAIN_SET_DIR, train_data, "goal"),
+                                        join(TRAIN_SET_DIR, train_data, "in"),
+                                        args.device,
                                         train_data))
-        with open(os.path.join("train", train_data, "ans"), "r") as f:
+        with open(join(TRAIN_SET_DIR, train_data, "ans"), "r") as f:
             answers.append([line.strip() for line in f])
     print("Training data loaded")
     loss = torch.nn.MSELoss()
 
     while True:
-        output = torch.tensor(0.0, device=device)
+        output = torch.tensor(0.0, device=args.device)
         for g, answer in zip(graphs, answers):
             graph_embedding = embedder(g)
             # [nodes, HIDDEN]
