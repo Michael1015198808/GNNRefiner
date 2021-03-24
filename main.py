@@ -9,15 +9,23 @@ from processor import GraphPreprocessor, NODES_TYPE_CNT
 from network import Embedding
 from socket import socket, AF_INET, SOCK_DGRAM
 
-from args import HIDDEN, device, MODEL_DIR, EDGES_TYPE_CNT
+import args
+from args import MODEL_DIR, EDGES_TYPE_CNT
 
 if __name__ == '__main__':
     # networks
-    embedder = Embedding(NODES_TYPE_CNT + 2, hidden_dim=HIDDEN, edges_type_cnt=EDGES_TYPE_CNT)
-    actor = nn.Sequential(nn.Linear(HIDDEN, HIDDEN), nn.ReLU(), nn.Linear(HIDDEN, 1), nn.Sigmoid()).to(device)
+    embedder = Embedding(feature_cnt=NODES_TYPE_CNT + 2,
+                         hidden_dim=args.latent_dim,
+                         edges_type_cnt=EDGES_TYPE_CNT,
+                         device=arg.device)
+    actor = nn.Sequential(
+            nn.Linear(args.latent_dim, args.latent_dim),
+            nn.ReLU(),
+            nn.Linear(args.latent_dim, 1),
+            nn.Sigmoid() ).to(args.device)
     # critic = nn.Sequential(nn.Linear(HIDDEN, HIDDEN), nn.ReLU(), nn.Linear(HIDDEN, 1))
     models = nn.ModuleList([embedder, actor])
-    optimizer = torch.optim.Adam(models.parameters(), lr = 1e-3) #, momentum=0.5)
+    optimizer = torch.optim.Adam(models.parameters(), lr=1e-3) #, momentum=0.5)
 
     try:
         checkpoint = torch.load(os.path.join(MODEL_DIR, 'model.pth'))
@@ -54,7 +62,7 @@ if __name__ == '__main__':
             print("Try to solve!")
             assert message == "SOLVING"
 
-            g = GraphPreprocessor("cons", "goal", "in", device)
+            g = GraphPreprocessor("cons", "goal", "in", args.device)
 
             # Policy Gradient
             if query_cnt == 0:

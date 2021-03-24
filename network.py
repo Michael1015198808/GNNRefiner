@@ -9,7 +9,6 @@ from processor import NODES_TYPE_CNT, GraphPreprocessor
 import dgl
 from dgl.nn.pytorch import RelGraphConv
 
-from args import device
 from typing import List
 
 class GCNConv(Module):
@@ -32,7 +31,8 @@ class GCNConv(Module):
         return self.updating2(x)
 
 class Embedding(torch.nn.Module):
-    def __init__(self, feature_cnt: int, edges_type_cnt: int, hidden_dim = 128, layer_dependent : bool = True):
+    def __init__(self, feature_cnt: int, edges_type_cnt: int, hidden_dim,
+                 device, layer_dependent : bool = True):
         super(Embedding, self).__init__()
         self.conv_input = Linear(feature_cnt, hidden_dim).to(device)
         # [n, feature_cnt] -> [n, hidden_dim]
