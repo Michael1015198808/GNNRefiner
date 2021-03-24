@@ -10,18 +10,18 @@ from network import Embedding
 from socket import socket, AF_INET, SOCK_DGRAM
 
 import args
-from args import MODEL_DIR, EDGES_TYPE_CNT
+from args import MODEL_DIR, EDGES_TYPE_CNT, latent_dim
 
 if __name__ == '__main__':
     # networks
     embedder = Embedding(feature_cnt=NODES_TYPE_CNT + 2,
-                         hidden_dim=args.latent_dim,
+                         hidden_dim=latent_dim,
                          edges_type_cnt=EDGES_TYPE_CNT,
-                         device=arg.device)
+                         device=args.device)
     actor = nn.Sequential(
-            nn.Linear(args.latent_dim, args.latent_dim),
+            nn.Linear(latent_dim, latent_dim),
             nn.ReLU(),
-            nn.Linear(args.latent_dim, 1),
+            nn.Linear(latent_dim, 1),
             nn.Sigmoid() ).to(args.device)
     # critic = nn.Sequential(nn.Linear(HIDDEN, HIDDEN), nn.ReLU(), nn.Linear(HIDDEN, 1))
     models = nn.ModuleList([embedder, actor])

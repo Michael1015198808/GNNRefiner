@@ -19,8 +19,8 @@ parser.add_argument("--layer-dependent", type=bool, default=False,
 
 args = parser.parse_args()
 
-args.device = torch.device(args.device)
-HIDDEN = args.latent_dim
+device = torch.device(args.device)
+latent_dim = args.latent_dim
 analysis = args.analysis
 MODEL_DIR = "models"
 
