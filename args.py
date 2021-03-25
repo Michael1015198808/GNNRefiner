@@ -14,7 +14,7 @@ parser.add_argument("--latent-dim", type=int, default=32,
                     help="latent dimension of massage vector")
 parser.add_argument("--analysis", default="kcfa",
                     help="the analysis to run")
-parser.add_argument("--layer-dependent", type=bool, default=False,
+parser.add_argument("--layer-dependent", action='store_true',
                     help="use layer (hop) dependent massage passing")
 
 args = parser.parse_args()
