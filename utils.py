@@ -7,6 +7,8 @@ import torch
 from processor import GraphPreprocessor
 from logger import log
 import args
+from args import MODEL_DIR
+from itertools import count
 
 def pretrain(embedder, actor, optimizer) -> None:
     graphs = []
@@ -23,11 +25,12 @@ def pretrain(embedder, actor, optimizer) -> None:
             answers.append([line.strip() for line in f])
     log("Training data loaded")
 
-    while True:
-        probs_pos = 0
-        pos_cnt = 0
-        probs_neg = 0
-        neg_cnt = 0
+    models = torch.nn.ModuleList([embedder, actor])
+    for epoch in count():
+        pos_probs = 0
+        pos_cnt   = 0
+        neg_probs = 0
+        neg_cnt   = 0
 
         output = torch.tensor(0.0, device=args.device)
         # for g, answer in zip(graphs, answers):
@@ -38,25 +41,32 @@ def pretrain(embedder, actor, optimizer) -> None:
             # [nodes, HIDDEN]
             v = actor(graph_embedding)[g.invoke_sites]
             # [invoke_sites, 1]
-            ans_tensor = torch.zeros_like(v)
+            ans_tensor = torch.zeros_like(v, dtype=torch.bool)
             weight = len(g.in_set) / len(answer)
             for ans in answer:
                 answer_idx = g.invoke_sites.index(g.nodes_dict[ans])
-                ans_tensor[answer_idx] = 1.0
-                probs_pos += v[answer_idx].item()
+                ans_tensor[answer_idx] = True
+                pos_probs += v[answer_idx].item()
 
             pos_cnt += len(answer)
             neg_cnt += len(g.in_set) - len(answer)
-            probs_neg += ((1 - ans_tensor) * v).sum().item()
+            neg_probs += v[~ans_tensor].sum().item()
             weight_tensor = (ans_tensor * weight) + 1
-            output += (weight_tensor * (v - ans_tensor) ** 2).mean()
+            output += (weight_tensor * (ans_tensor + (-v)) ** 2).mean()
 
-        log()
-        print("average predict value of postive:  %.4f" % (probs_pos / pos_cnt))
-        print("average predict value of negative: %.4f" % (probs_neg / neg_cnt))
+        log("Epoch", epoch)
+        print("average predict value of postive:  %.4f" % (pos_probs / pos_cnt))
+        print("average predict value of negative: %.4f" % (neg_probs / neg_cnt))
         print("loss", output.item())
         if output.item() < 0.1:
             return
         optimizer.zero_grad()
         output.backward()
         optimizer.step()
+
+        if epoch % 10 == 0:
+            if not os.path.exists(MODEL_DIR):
+                os.makedirs(MODEL_DIR)
+            state_dict = models.state_dict()
+            torch.save(state_dict, join(MODEL_DIR, 'model-%d.pth' % epoch))
+            print("Model saved")
