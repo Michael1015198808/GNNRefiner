@@ -3,7 +3,7 @@ import math
 import torch
 import torch.nn.functional as F
 from torch import Tensor
-from torch.nn import Linear, Parameter, ParameterList, Module
+from torch.nn import Linear, Module, ModuleList
 from processor import NODES_TYPE_CNT, GraphPreprocessor
 
 import dgl
@@ -38,9 +38,9 @@ class Embedding(torch.nn.Module):
         # [n, feature_cnt] -> [n, hidden_dim]
         self.layer_dependent = layer_dependent
         if layer_dependent:
-            self.conv_passing = [
+            self.conv_passing = ModuleList([
                 GCNConv(hidden_dim, hidden_dim, hidden_dim, edges_type_cnt).to(device)
-                for _ in range(10)]
+                for _ in range(10)])
         else:
             self.conv_passing = GCNConv(hidden_dim, hidden_dim, hidden_dim, edges_type_cnt).to(device)
         # [n, hidden_dim] -> [n, hidden_dim]
