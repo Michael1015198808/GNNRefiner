@@ -20,6 +20,8 @@ parser.add_argument("--model", default=None,
                     help="use pretrained model (support full path and relative path)")
 parser.add_argument("--skip-pretrain", action="store_true",
                     help="skip pretrain")
+parser.add_argument("--validate", default=None,
+                    help="graph used for validation")
 
 args = parser.parse_args()
 

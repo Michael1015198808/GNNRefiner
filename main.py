@@ -3,7 +3,7 @@ import os
 import torch
 import torch.nn as nn
 import numpy as np
-from utils import pretrain
+from utils import pretrain, validate
 
 from processor import GraphPreprocessor, NODES_TYPE_CNT
 from network import Embedding
@@ -38,6 +38,9 @@ if __name__ == '__main__':
             os.makedirs(MODEL_DIR)
         state_dict = models.state_dict()
         torch.save(state_dict, os.path.join(MODEL_DIR, 'model.pth'))
+    if args.validate:
+        validate(embedder, actor, args.validate)
+        exit(0)
 
     RLserver = socket(AF_INET, SOCK_DGRAM)
     RLserver.bind(('', 2021))
