@@ -16,6 +16,10 @@ parser.add_argument("--analysis", default="kcfa",
                     help="the analysis to run")
 parser.add_argument("--layer-dependent", action='store_true',
                     help="use layer (hop) dependent massage passing")
+parser.add_argument("--model", default=None,
+                    help="use pretrained model (support full path and relative path)")
+parser.add_argument("--skip-pretrain", action="store_true",
+                    help="skip pretrain")
 
 args = parser.parse_args()
 

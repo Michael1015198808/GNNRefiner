@@ -9,8 +9,7 @@ from processor import GraphPreprocessor, NODES_TYPE_CNT
 from network import Embedding
 from socket import socket, AF_INET, SOCK_DGRAM
 
-import args
-from args import MODEL_DIR, EDGES_TYPE_CNT, latent_dim
+from args import args, MODEL_DIR, EDGES_TYPE_CNT, latent_dim
 
 if __name__ == '__main__':
     # networks
@@ -27,12 +26,11 @@ if __name__ == '__main__':
     models = nn.ModuleList([embedder, actor])
     optimizer = torch.optim.Adam(models.parameters(), lr=1e-3) #, momentum=0.5)
 
-    try:
-        checkpoint = torch.load(os.path.join(MODEL_DIR, 'model.pth'))
+    if args.model:
+        checkpoint = torch.load(args.model)
         print("Pretrained model file found. Start with pretrained model")
         models.load_state_dict(checkpoint)
-    except FileNotFoundError as e:
-        print("Pretrained model file not found. Start with a random model")
+    if not args.skip_pretrain:
         print("pretrain started")
         pretrain(embedder, actor, optimizer)
         print("pretrain finished")
