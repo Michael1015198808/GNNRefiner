@@ -6,7 +6,7 @@ import torch
 
 from processor import GraphPreprocessor
 from logger import log
-from args import args, MODEL_DIR
+from cmd_args import args, MODEL_DIR
 from itertools import count
 
 def pretrain(embedder, actor, optimizer) -> None:

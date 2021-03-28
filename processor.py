@@ -1,7 +1,7 @@
 from typing import List, Tuple, Dict
 
 import torch
-from args import NODES_TYPE_DICT, NODES_TYPE_CNT, EDGES_TYPE_DICT, EDGES_TYPE_CNT
+from cmd_args import NODES_TYPE_DICT, NODES_TYPE_CNT, EDGES_TYPE_DICT, EDGES_TYPE_CNT
 
 class GraphPreprocessor(object):
     def __init__(self, cons_name: str, goal_name: str, in_name: str, device, graph_name = None):
