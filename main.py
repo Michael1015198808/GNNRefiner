@@ -24,7 +24,7 @@ if __name__ == '__main__':
             nn.Sigmoid() ).to(args.device)
     # critic = nn.Sequential(nn.Linear(HIDDEN, HIDDEN), nn.ReLU(), nn.Linear(HIDDEN, 1))
     models = nn.ModuleList([embedder, actor])
-    optimizer = torch.optim.Adam(models.parameters(), lr=1e-3) #, momentum=0.5)
+    optimizer = torch.optim.Adam(models.parameters(), lr=args.lr, weight_decay=1e-4) #, momentum=0.5)
 
     if args.model:
         checkpoint = torch.load(args.model)
