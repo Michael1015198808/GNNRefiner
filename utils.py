@@ -6,8 +6,7 @@ import torch
 
 from processor import GraphPreprocessor
 from logger import log
-import args
-from args import MODEL_DIR
+from args import args, MODEL_DIR
 from itertools import count
 
 def pretrain(embedder, actor, optimizer) -> None:
@@ -68,7 +67,7 @@ def pretrain(embedder, actor, optimizer) -> None:
             if not os.path.exists(MODEL_DIR):
                 os.makedirs(MODEL_DIR)
             state_dict = models.state_dict()
-            torch.save(state_dict, join(MODEL_DIR, 'model-%d.pth' % epoch))
+            torch.save(state_dict, join(MODEL_DIR, 'model-%s-%d.pth' % (args.analysis, epoch)))
             print("Model saved")
 
 def validate(embedder, actor, test_case: str) -> None:
