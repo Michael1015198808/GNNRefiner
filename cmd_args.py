@@ -22,6 +22,8 @@ parser.add_argument("--skip-pretrain", action="store_true",
                     help="skip pretrain")
 parser.add_argument("--validate", nargs="+", default=None,
                     help="graph used for validation")
+parser.add_argument("--validate-models", nargs="+", default=None,
+                    help="models used for validation")
 parser.add_argument("--lr", "--learning-rate", type=float, default=1e-3,
                     help="learning rate of neural network")
 

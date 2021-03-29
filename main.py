@@ -26,6 +26,9 @@ if __name__ == '__main__':
     models = nn.ModuleList([embedder, actor])
     optimizer = torch.optim.Adam(models.parameters(), lr=args.lr, weight_decay=1e-4) #, momentum=0.5)
 
+    if args.validate:
+        validate(embedder, actor, args.validate, args.validate_models)
+        exit(0)
     if args.model:
         checkpoint = torch.load(args.model)
         print("Pretrained model file found. Start with pretrained model")
@@ -38,9 +41,6 @@ if __name__ == '__main__':
             os.makedirs(MODEL_DIR)
         state_dict = models.state_dict()
         torch.save(state_dict, os.path.join(MODEL_DIR, 'model.pth'))
-    if args.validate:
-        validate(embedder, actor, args.validate)
-        exit(0)
 
     RLserver = socket(AF_INET, SOCK_DGRAM)
     RLserver.bind(('', 2021))
