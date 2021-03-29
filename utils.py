@@ -1,3 +1,4 @@
+from typing import List
 import os
 from os.path import join
 
@@ -70,40 +71,54 @@ def pretrain(embedder, actor, optimizer) -> None:
             torch.save(state_dict, join(MODEL_DIR, 'model-%s-%d.pth' % (args.analysis, epoch)))
             print("Model saved")
 
-def validate(embedder, actor, test_case: str) -> None:
-    log("Loading validate data")
-    TRAIN_SET_DIR = join("train", test_case)
-    graph = GraphPreprocessor(join(TRAIN_SET_DIR, "cons"),
-                              join(TRAIN_SET_DIR, "goal"),
-                              join(TRAIN_SET_DIR, "in"),
-                              args.device,
-                              test_case)
-    with open(join(TRAIN_SET_DIR, "ans"), "r") as f:
-        answer = [line.strip() for line in f]
-    log("validate data loaded")
+def validate(embedder, actor, test_cases: List[str]) -> None:
+    log("Start validation!")
+    pos_probs_all = 0
+    pos_cnt_all = 0
+    neg_probs_all = 0
+    neg_cnt_all = 0
+    for test_case in test_cases:
+        log("Loading validate data")
+        graph = GraphPreprocessor(join(test_case, "cons"),
+                                  join(test_case, "goal"),
+                                  join(test_case, "in"),
+                                  args.device,
+                                  test_case)
+        with open(join(test_case, "ans"), "r") as f:
+            answer = [line.strip() for line in f]
+        log("validate graph %s loaded" % test_case)
 
-    embedder.eval()
-    actor.eval()
+        embedder.eval()
+        actor.eval()
 
 
-    pos_probs = 0
-    graph_embedding = embedder(graph)
-    # [nodes, HIDDEN]
-    v = actor(graph_embedding)[graph.invoke_sites]
-    # [invoke_sites, 1]
-    ans_tensor = torch.zeros_like(v, dtype=torch.bool)
-    weight = len(graph.in_set) / len(answer)
-    for ans in answer:
-        answer_idx = graph.invoke_sites.index(graph.nodes_dict[ans])
-        ans_tensor[answer_idx] = True
-        pos_probs += v[answer_idx].item()
+        pos_probs = 0
+        graph_embedding = embedder(graph)
+        # [nodes, HIDDEN]
+        v = actor(graph_embedding)[graph.invoke_sites]
+        # [invoke_sites, 1]
+        ans_tensor = torch.zeros_like(v, dtype=torch.bool)
+        weight = len(graph.in_set) / len(answer)
+        for ans in answer:
+            answer_idx = graph.invoke_sites.index(graph.nodes_dict[ans])
+            ans_tensor[answer_idx] = True
+            pos_probs += v[answer_idx].item()
 
-    pos_cnt = len(answer)
-    neg_cnt = len(graph.in_set) - len(answer)
-    neg_probs = v[~ans_tensor].sum().item()
-    weight_tensor = (ans_tensor * weight) + 1
-    output = (weight_tensor * (ans_tensor + (-v)) ** 2).mean()
+        pos_cnt = len(answer)
+        neg_cnt = len(graph.in_set) - len(answer)
+        neg_probs = v[~ans_tensor].sum().item()
+        weight_tensor = (ans_tensor * weight) + 1
+        output = (weight_tensor * (ans_tensor + (-v)) ** 2).mean()
 
-    print("average predict value of postive:  %.4f" % (pos_probs / pos_cnt))
-    print("average predict value of negative: %.4f" % (neg_probs / neg_cnt))
-    print("loss", output.item())
+        pos_probs_all += pos_probs
+        pos_cnt_all += pos_cnt
+        neg_probs_all += neg_probs
+        neg_cnt_all += neg_cnt
+
+        print("finish validating %s" % graph.graph_name)
+        print("average predict value of postive:  %.4f" % (pos_probs / pos_cnt))
+        print("average predict value of negative: %.4f" % (neg_probs / neg_cnt))
+        print("loss", output.item())
+
+    print("Overall averate predict value of postive:  %.4f" % (pos_probs_all / pos_cnt_all))
+    print("Overall averate predict value of negative: %.4f" % (neg_probs_all / neg_cnt_all))
