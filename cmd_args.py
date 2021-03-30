@@ -6,13 +6,16 @@ from typing import Dict
 
 import torch
 
-parser = argparse.ArgumentParser(description="A naïve GNN-based abstraction refinement program")
+parser = argparse.ArgumentParser(description="A naïve GNN-based abstraction refinement program",
+                                 formatter_class=argparse.ArgumentDefaultsHelpFormatter,
+                                 allow_abbrev=False)
 
 parser.add_argument("--device", default="cpu",
                     help="device to run GNN.")
 parser.add_argument("--latent-dim", type=int, default=32,
                     help="latent dimension of massage vector")
 parser.add_argument("--analysis", default="kcfa",
+                    choices=["kcfa", "kobj"],
                     help="the analysis to run")
 parser.add_argument("--layer-dependent", action='store_true',
                     help="use layer (hop) dependent massage passing")
