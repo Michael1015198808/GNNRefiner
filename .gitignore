@@ -1,6 +1,13 @@
 # The code is derived from https://github.com/github/gitignore/blob/master/Python.gitignore
 
 # Project-wised
+# - Automatically dumped/generated
+models
+*.png
+*.jpg
+*.jpeg
+
+# - Evaluation/Inferance related
 ans
 cons
 goal
