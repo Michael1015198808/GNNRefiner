@@ -29,8 +29,12 @@ parser.add_argument("--validate-models", nargs="+", default=None,
                     help="models used for validation")
 parser.add_argument("--lr", "--learning-rate", type=float, default=1e-3,
                     help="learning rate of neural network")
+parser.add_argument("--hide-args", action='store_false',
+                    help="hide result of argument parsing")
 
 args = parser.parse_args()
+if not args.hide_args:
+    print(args)
 
 device = torch.device(args.device)
 latent_dim = args.latent_dim
