@@ -29,7 +29,7 @@ parser.add_argument("--validate-models", nargs="+", default=None,
                     help="models used for validation")
 parser.add_argument("--lr", "--learning-rate", type=float, default=1e-3,
                     help="learning rate of neural network")
-parser.add_argument("--hide-args", action='store_false',
+parser.add_argument("--hide-args", action='store_true',
                     help="hide result of argument parsing")
 
 args = parser.parse_args()
