@@ -9,6 +9,8 @@ from processor import GraphPreprocessor
 from logger import log
 from cmd_args import args, MODEL_DIR
 from itertools import count
+import matplotlib.pyplot as plt
+from collections import defaultdict
 
 def pretrain(embedder, actor, optimizer) -> None:
     graphs = []
@@ -91,44 +93,61 @@ def validate(embedder, actor, test_cases: List[str], evaluate_models: List[str])
     actor.eval()
     models = torch.nn.ModuleList([embedder, actor])
 
-    for model in evaluate_models:
-        checkpoint = torch.load(model)
-        models.load_state_dict(checkpoint)
-        log(model, "loaded")
+    with torch.no_grad():
+        d = defaultdict(int)
+        for model in evaluate_models:
+            checkpoint = torch.load(model)
+            models.load_state_dict(checkpoint)
+            log(model, "loaded")
 
-        pos_probs_all = 0
-        pos_cnt_all = 0
-        neg_probs_all = 0
-        neg_cnt_all = 0
-        for graph, answer in zip(graphs, answers):
-            pos_probs = 0
-            graph_embedding = embedder(graph)
-            # [nodes, HIDDEN]
-            v = actor(graph_embedding)[graph.invoke_sites]
-            # [invoke_sites, 1]
-            ans_tensor = torch.zeros_like(v, dtype=torch.bool)
-            weight = len(graph.in_set) / len(answer)
-            for ans in answer:
-                answer_idx = graph.invoke_sites.index(graph.nodes_dict[ans])
-                ans_tensor[answer_idx] = True
-                pos_probs += v[answer_idx].item()
+            pos_probs_all = 0
+            pos_cnt_all = 0
+            pos_val = []
+            neg_probs_all = 0
+            neg_cnt_all = 0
+            neg_val = []
+            for graph, answer in zip(graphs, answers):
+                pos_probs = 0
+                graph_embedding = embedder(graph)
+                # [nodes, HIDDEN]
+                v = actor(graph_embedding)[graph.invoke_sites]
+                for node in ["DenyO(1,1)", "DenyO(1388,1)"]:
+                    print(node, actor(graph_embedding[graph.nodes_dict[node]]))
+                    print(node, v[graph.invoke_sites.index(graph.nodes_dict[node])])
+                # [invoke_sites, 1]
+                ans_tensor = torch.zeros_like(v, dtype=torch.bool)
+                weight = len(graph.in_set) / len(answer)
+                for ans in answer:
+                    answer_idx = graph.invoke_sites.index(graph.nodes_dict[ans])
+                    ans_tensor[answer_idx] = True
+                    pos_probs += v[answer_idx].item()
 
-            pos_cnt = len(answer)
-            neg_cnt = len(graph.in_set) - len(answer)
-            neg_probs = v[~ans_tensor].sum().item()
-            weight_tensor = (ans_tensor * weight) + 1
-            output = (weight_tensor * (ans_tensor + (-v)) ** 2).mean()
+                pos_cnt = len(answer)
+                pos_val.extend(v[ans_tensor].tolist())
+                neg_cnt = len(graph.in_set) - len(answer)
+                neg_val.extend(v[~ans_tensor].tolist())
+                neg_probs = v[~ans_tensor].sum().item()
+                weight_tensor = (ans_tensor * weight) + 1
+                output = (weight_tensor * (ans_tensor + (-v)) ** 2).mean()
 
-            pos_probs_all += pos_probs
-            pos_cnt_all += pos_cnt
-            neg_probs_all += neg_probs
-            neg_cnt_all += neg_cnt
+                pos_probs_all += pos_probs
+                pos_cnt_all += pos_cnt
+                neg_probs_all += neg_probs
+                neg_cnt_all += neg_cnt
 
-            print("finish validating %s" % graph.graph_name)
-            print("average predict value of postive:  %.4f" % (pos_probs / pos_cnt))
-            print("average predict value of negative: %.4f" % (neg_probs / neg_cnt))
-            print("loss", output.item())
+                print("finish validating %s" % graph.graph_name)
+                print("average predict value of postive:  %.4f" % (pos_probs / pos_cnt))
+                print("average predict value of negative: %.4f" % (neg_probs / neg_cnt))
+                print("loss", output.item())
 
-        print("validation for %s finished" % model)
-        print("Overall averate predict value of postive:  %.4f" % (pos_probs_all / pos_cnt_all))
-        print("Overall averate predict value of negative: %.4f" % (neg_probs_all / neg_cnt_all))
+            for x in torch.nonzero(v.reshape(-1) >= 0.7).reshape(-1).tolist():
+                d[x] += 1
+            print("validation for %s finished" % model)
+            print("Overall averate predict value of postive:  %.4f" % (pos_probs_all / pos_cnt_all))
+            print("Overall averate predict value of negative: %.4f" % (neg_probs_all / neg_cnt_all))
+            _, axs = plt.subplots(2, 1, sharex=True, tight_layout=True)
+            axs[0].hist(pos_val, color='r', range=(0, 1), bins=20)
+            axs[1].hist(neg_val, color='b', range=(0, 1), bins=20)
+            plt.savefig(model[model.rfind("/") + 1: -4] + ".png")
+    for idx, cnt in sorted(d.items(), key=lambda x: x[1]):
+        print(graph.nodes[graph.invoke_sites[idx]], cnt)
