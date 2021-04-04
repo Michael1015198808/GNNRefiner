@@ -56,7 +56,7 @@ def pretrain(embedder, actor, optimizer) -> None:
             output += (weight_tensor * (ans_tensor + (-v)) ** 2).mean()
 
         log("Epoch", epoch)
-        print("average predict value of postive:  %.4f" % (pos_probs / pos_cnt))
+        print("average predict value of positive: %.4f" % (pos_probs / pos_cnt))
         print("average predict value of negative: %.4f" % (neg_probs / neg_cnt))
         print("loss", output.item())
         if output.item() < 0.1:
@@ -130,12 +130,12 @@ def validate(embedder, actor, test_cases: List[str], evaluate_models: List[str])
                 neg_cnt_all += neg_cnt
 
                 print("finish validating %s" % graph.graph_name)
-                print("average predict value of postive:  %.4f" % (pos_probs / pos_cnt))
+                print("average predict value of positive: %.4f" % (pos_probs / pos_cnt))
                 print("average predict value of negative: %.4f" % (neg_probs / neg_cnt))
                 print("loss", output.item())
 
             print("validation for %s finished" % model)
-            print("Overall averate predict value of postive:  %.4f" % (pos_probs_all / pos_cnt_all))
+            print("Overall averate predict value of positive: %.4f" % (pos_probs_all / pos_cnt_all))
             print("Overall averate predict value of negative: %.4f" % (neg_probs_all / neg_cnt_all))
             _, axs = plt.subplots(2, 1, sharex=True, tight_layout=True)
             axs[0].hist(pos_val, color='r', range=(0, 1), bins=20)
