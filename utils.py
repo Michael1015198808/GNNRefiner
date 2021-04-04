@@ -66,8 +66,7 @@ def pretrain(embedder, actor, optimizer) -> None:
         optimizer.step()
 
         if epoch % 50 == 0:
-            if not os.path.exists(MODEL_DIR):
-                os.makedirs(MODEL_DIR)
+            os.makedirs(MODEL_DIR, exist_ok=True)
             state_dict = models.state_dict()
             torch.save(state_dict, join(MODEL_DIR, 'model-%s-%d.pth' % (args.analysis, epoch)))
             print("Model saved")

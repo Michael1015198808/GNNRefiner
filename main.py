@@ -37,8 +37,7 @@ if __name__ == '__main__':
         print("pretrain started")
         pretrain(embedder, actor, optimizer)
         print("pretrain finished")
-        if not os.path.exists(MODEL_DIR):
-            os.makedirs(MODEL_DIR)
+        os.makedirs(MODEL_DIR, exist_ok=True)
         state_dict = models.state_dict()
         torch.save(state_dict, os.path.join(MODEL_DIR, 'model.pth'))
 
