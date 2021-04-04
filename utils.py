@@ -40,7 +40,7 @@ def pretrain(embedder, actor, optimizer) -> None:
             answer = answers[idx]
             graph_embedding = embedder(g)
             # [nodes, HIDDEN]
-            v = actor(graph_embedding)[g.invoke_sites]
+            v = actor(graph_embedding[g.invoke_sites])
             # [invoke_sites, 1]
             ans_tensor = torch.zeros_like(v, dtype=torch.bool)
             weight = len(g.in_set) / len(answer)
@@ -107,7 +107,7 @@ def validate(embedder, actor, test_cases: List[str], evaluate_models: List[str])
                 pos_probs = 0
                 graph_embedding = embedder(graph)
                 # [nodes, HIDDEN]
-                v = actor(graph_embedding)[graph.invoke_sites]
+                v = actor(graph_embedding[graph.invoke_sites])
                 # [invoke_sites, 1]
                 ans_tensor = torch.zeros_like(v, dtype=torch.bool)
                 weight = len(graph.in_set) / len(answer)
@@ -140,4 +140,5 @@ def validate(embedder, actor, test_cases: List[str], evaluate_models: List[str])
             _, axs = plt.subplots(2, 1, sharex=True, tight_layout=True)
             axs[0].hist(pos_val, color='r', range=(0, 1), bins=20)
             axs[1].hist(neg_val, color='b', range=(0, 1), bins=20)
-            plt.savefig(model[model.rfind("/") + 1: -4] + ".png")
+            os.makedirs("pics", exist_ok=True)
+            plt.savefig(join("pics", model[model.rfind("/") + 1: -4] + ".png"))
