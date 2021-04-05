@@ -17,14 +17,15 @@ parser.add_argument("--latent-dim", type=int, default=32,
 parser.add_argument("--analysis", default="kcfa",
                     choices=["kcfa", "kobj"],
                     help="the analysis to run")
+parser.add_argument("--phase", default="pretrain",
+                    choices=["pretrain", "validate"],
+                    help="the analysis to run")
 parser.add_argument("--layer-dependent", action='store_true',
                     help="use layer (hop) dependent massage passing")
 parser.add_argument("--model", default=None,
                     help="use pretrained model (support full path and relative path)")
-parser.add_argument("--skip-pretrain", action="store_true",
-                    help="skip pretrain")
-parser.add_argument("--validate", nargs="+", default=None,
-                    help="graph used for validation")
+parser.add_argument("--graphs", nargs="+", default=None,
+                    help="derivation graphs used for pretrain or validation")
 parser.add_argument("--validate-models", nargs="+", default=None,
                     help="models used for validation")
 parser.add_argument("--lr", "--learning-rate", type=float, default=1e-3,

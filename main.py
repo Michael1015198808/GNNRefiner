@@ -26,20 +26,21 @@ if __name__ == '__main__':
     models = nn.ModuleList([embedder, actor])
     optimizer = torch.optim.Adam(models.parameters(), lr=args.lr, weight_decay=1e-4) #, momentum=0.5)
 
-    if args.validate:
-        validate(embedder, actor, args.validate, args.validate_models)
+    if args.phase == "validate":
+        validate(embedder, actor)
         exit(0)
-    if args.model:
-        checkpoint = torch.load(args.model)
-        print("Pretrained model file found. Start with pretrained model")
-        models.load_state_dict(checkpoint)
-    if not args.skip_pretrain:
+    elif args.phase == "pretrain":
+        if args.model:
+            checkpoint = torch.load(args.model)
+            print("Pretrained model file found. Start with pretrained model")
+            models.load_state_dict(checkpoint)
         print("pretrain started")
         pretrain(embedder, actor, optimizer)
         print("pretrain finished")
         os.makedirs(MODEL_DIR, exist_ok=True)
         state_dict = models.state_dict()
         torch.save(state_dict, os.path.join(MODEL_DIR, 'model.pth'))
+        exit(0)
 
     RLserver = socket(AF_INET, SOCK_DGRAM)
     RLserver.bind(('', 2021))

@@ -71,12 +71,12 @@ def pretrain(embedder, actor, optimizer) -> None:
             torch.save(state_dict, join(MODEL_DIR, 'model-%s-%d.pth' % (args.analysis, epoch)))
             print("Model saved")
 
-def validate(embedder, actor, test_cases: List[str], evaluate_models: List[str]) -> None:
+def validate(embedder, actor) -> None:
     log("Start validation!")
     graphs  = []
     answers = []
     log("Loading validate data")
-    for test_case in test_cases:
+    for test_case in args.graphs:
         graphs.append(GraphPreprocessor(join(test_case, "cons"),
                                         join(test_case, "goal"),
                                         join(test_case, "in"),
@@ -92,7 +92,7 @@ def validate(embedder, actor, test_cases: List[str], evaluate_models: List[str])
     models = torch.nn.ModuleList([embedder, actor])
 
     with torch.no_grad():
-        for model in evaluate_models:
+        for model in args.validate_models:
             checkpoint = torch.load(model)
             models.load_state_dict(checkpoint)
             log(model, "loaded")
