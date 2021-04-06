@@ -1,4 +1,4 @@
-from typing import List
+from typing import List, Tuple
 import os
 from os.path import join
 
@@ -11,19 +11,34 @@ from cmd_args import args, MODEL_DIR
 from itertools import count
 import matplotlib.pyplot as plt
 
+def load_graphs() -> Tuple[List, List]:
+    if args.dumped_graphs:
+        import pickle
+        with open(args.dumped_graphs, "rb") as f:
+            return pickle.load(f)
+    else:
+        graphs = []
+        answers = []
+        for test_case in args.graphs:
+            graphs.append(GraphPreprocessor(join(test_case, "cons"),
+                                            join(test_case, "goal"),
+                                            join(test_case, "in"),
+                                            args.device,
+                                            test_case))
+            with open(join(test_case, "ans"), "r") as f:
+                answers.append([line.strip() for line in f])
+            log("graph %s loaded" % test_case)
+
+        if args.dump_graphs:
+            import pickle
+            with open(args.dump_validation_set, "wb") as f:
+                pickle.dump((graphs, answers), f)
+            log("dump validation set to %s" % args.dump_graphs)
+        return graphs, answers
+
 def pretrain(embedder, actor, optimizer) -> None:
-    graphs = []
-    answers = []
     log("Loading training data")
-    TRAIN_SET_DIR = join("train", args.analysis)
-    for train_data in os.listdir(TRAIN_SET_DIR):
-        graphs.append(GraphPreprocessor(join(TRAIN_SET_DIR, train_data, "cons"),
-                                        join(TRAIN_SET_DIR, train_data, "goal"),
-                                        join(TRAIN_SET_DIR, train_data, "in"),
-                                        args.device,
-                                        train_data))
-        with open(join(TRAIN_SET_DIR, train_data, "ans"), "r") as f:
-            answers.append([line.strip() for line in f])
+    graphs, answers = load_graphs()
     log("Training data loaded")
 
     models = torch.nn.ModuleList([embedder, actor])
@@ -72,25 +87,15 @@ def pretrain(embedder, actor, optimizer) -> None:
             print("Model saved")
 
 def validate(embedder, actor) -> None:
-    log("Start validation!")
-    graphs  = []
-    answers = []
     log("Loading validate data")
-    for test_case in args.graphs:
-        graphs.append(GraphPreprocessor(join(test_case, "cons"),
-                                        join(test_case, "goal"),
-                                        join(test_case, "in"),
-                                        args.device,
-                                        test_case))
-        with open(join(test_case, "ans"), "r") as f:
-            answers.append([line.strip() for line in f])
-        log("validate graph %s loaded" % test_case)
+    graphs, answers = load_graphs()
     log("Validate data loaded")
 
     embedder.eval()
     actor.eval()
     models = torch.nn.ModuleList([embedder, actor])
 
+    log("Start validation!")
     with torch.no_grad():
         for model in args.validate_models:
             checkpoint = torch.load(model)

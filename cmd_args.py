@@ -24,8 +24,13 @@ parser.add_argument("--layer-dependent", action='store_true',
                     help="use layer (hop) dependent massage passing")
 parser.add_argument("--model", default=None,
                     help="use pretrained model (support full path and relative path)")
-parser.add_argument("--graphs", nargs="+", default=None,
-                    help="derivation graphs used for pretrain or validation")
+graph_group = parser.add_mutually_exclusive_group(required=True)
+graph_group.add_argument("--graphs", nargs="+", default=None,
+                         help="derivation graphs used for pretrain or validation")
+graph_group.add_argument("--dumped-graphs",
+                         help="Use dumped derivation set for pretrain or validation")
+parser.add_argument("--dump-validation-set",
+                    help="Dump validation set for further usage")
 parser.add_argument("--validate-models", nargs="+", default=None,
                     help="models used for validation")
 parser.add_argument("--lr", "--learning-rate", type=float, default=1e-3,
