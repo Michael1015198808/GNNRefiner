@@ -2,6 +2,7 @@
 
 # Project-wised
 # - Automatically dumped/generated
+bin
 models
 *.png
 *.jpg
@@ -12,6 +13,9 @@ ans
 cons
 goal
 in
+
+# - Scripts
+*.sh
 
 # IDEs
 .idea
