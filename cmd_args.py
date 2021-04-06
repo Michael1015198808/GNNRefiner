@@ -29,7 +29,7 @@ graph_group.add_argument("--graphs", nargs="+", default=None,
                          help="derivation graphs used for pretrain or validation")
 graph_group.add_argument("--dumped-graphs",
                          help="Use dumped derivation set for pretrain or validation")
-parser.add_argument("--dump-validation-set",
+parser.add_argument("--dump-graphs-to",
                     help="Dump validation set for further usage")
 parser.add_argument("--validate-models", nargs="+", default=None,
                     help="models used for validation")
