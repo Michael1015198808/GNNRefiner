@@ -15,7 +15,7 @@ class GCNConv(Module):
     def __init__(self, in_channels, hidden_channels, out_channels, edges_type_cnt):
         super(GCNConv, self).__init__()
         self.passing = RelGraphConv(in_channels, out_channels, edges_type_cnt, low_mem=True)
-        self.updating1 = Linear(in_channels + hidden_channels, in_channels + hidden_channels)
+        self.updating1 = Linear(in_channels + hidden_channels, hidden_channels)
         self.updating2 = Linear(in_channels + hidden_channels, out_channels)
 
     def forward(self, g, x, edges_type):
@@ -27,8 +27,8 @@ class GCNConv(Module):
         # mid has shape [nodes, HIDDEN]
 
         # Updating nodes' states using previous states(x) and current messages(mid).
-        x = torch.relu(self.updating1(torch.cat([x, mid], dim = 1)))
-        return self.updating2(x)
+        mid = torch.relu(self.updating1(torch.cat([x, mid], dim=1)))
+        return self.updating2(torch.cat([x, mid], dim=1))
 
 class Embedding(torch.nn.Module):
     def __init__(self, feature_cnt: int, edges_type_cnt: int, hidden_dim,

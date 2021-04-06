@@ -18,7 +18,9 @@ if __name__ == '__main__':
                          edges_type_cnt=EDGES_TYPE_CNT,
                          device=args.device)
     actor = nn.Sequential(
-            nn.Linear(latent_dim, latent_dim),
+            nn.Linear(latent_dim, 2 * latent_dim),
+            nn.ReLU(),
+            nn.Linear(2 * latent_dim, latent_dim),
             nn.ReLU(),
             nn.Linear(latent_dim, 1),
             nn.Sigmoid() ).to(args.device)
