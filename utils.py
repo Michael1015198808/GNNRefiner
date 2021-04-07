@@ -115,9 +115,11 @@ def validate(embedder, actor) -> None:
                 graph_embedding = embedder(graph)
                 # [nodes, HIDDEN]
                 v = actor(graph_embedding[graph.invoke_sites])
+                '''
                 for node in ["DenyO(1387,1)", "DenyO(1388,1)"]:
                     print(node, actor(graph_embedding[graph.nodes_dict[node]]))
                     print(node, v[graph.invoke_sites.index(graph.nodes_dict[node])])
+                '''
                 # [invoke_sites, 1]
                 ans_tensor = torch.zeros_like(v, dtype=torch.bool)
                 weight = len(graph.in_set) / len(answer)
@@ -155,7 +157,7 @@ def validate(embedder, actor) -> None:
             axs[1].hist(neg_val, color='b', range=(0, 1), bins=20)
             os.makedirs("pics", exist_ok=True)
             plt.savefig(join("pics", model[model.rfind("/") + 1: -4] + ".png"))
-        for graph_name, d in d_all:
+        for graph_name, d in d_all.items():
             print("====%s===="%graph_name)
             for idx, cnt in sorted(d.items(), key=lambda x: x[1]):
                 print(graph.nodes[graph.invoke_sites[idx]], cnt)

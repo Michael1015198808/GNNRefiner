@@ -59,13 +59,16 @@ class Embedding(torch.nn.Module):
         if self.layer_dependent:
             for layer in self.conv_passing:
                 x = torch.relu(layer(g, x, data.edges_type))
+                '''
                 print("DenyO(1387,1)", x[data.nodes_dict["DenyO(1387,1)"]].tolist())
                 print("DenyO(1388,1)", x[data.nodes_dict["DenyO(1388,1)"]].tolist())
                 print("distance", ((x[data.nodes_dict["DenyO(1387,1)"]] - x[data.nodes_dict["DenyO(1388,1)"]]) ** 2).sum().item())
+                '''
         else:
             for i in range(10):
                 x = torch.relu(self.conv_passing(g, x, data.edges_type))
 
+        '''
         ans_idx = data.nodes_dict["DenyO(1388,1)"]
         ans_x   = x[ans_idx]
         similar_idx = min(range(data.nodes_cnt), key=lambda idx: ((x[idx] - ans_x) ** 2).sum() if idx != ans_idx else 1e5)
@@ -77,6 +80,7 @@ class Embedding(torch.nn.Module):
                   ))
         print(x[similar_idx].tolist())
         print(ans_x.tolist())
+        '''
         return x
         for node in ["DenyO(1,1)", "DenyO(1388,1)"]:
             print(node, x[data.nodes_dict[node]])
