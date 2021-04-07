@@ -37,6 +37,49 @@ def load_graphs() -> Tuple[List, List]:
             log("dump validation set to %s" % args.dump_graphs_to)
         return graphs, answers
 
+def bfs() -> None:
+    if len(args.dumped_graphs) > 1:
+        print("BFS will only be operated on the first graph %s."%args.dumped_graphs[0])
+        print("Other graphs will be ignored.")
+
+    (g, *_), _ = load_graphs()
+
+    edges = defaultdict(list)
+
+    for pre, nxt in zip(*g.edges.tolist()):
+        edges[nxt].append(pre)
+
+    for start in ["DenyO(373,1)", "DenyO(381,1)"]:
+        cur_layer = [g.nodes_dict[start]]
+        nxt_layer = []
+        seqs = [cur_layer]
+
+        succ = {g.nodes_dict[start]: g.nodes_dict[start]}
+        log("Start iterating")
+
+        for i in range(15):
+            for cur in cur_layer:
+                for nxt in edges[cur]:
+                    if not nxt in succ:
+                        nxt_layer.append(nxt)
+                        succ[nxt] = cur
+
+            seqs.append(nxt_layer)
+            cur_layer = nxt_layer
+            nxt_layer = []
+
+        log("Finished iterating")
+        with open("new" + start + ".log", "w") as f:
+            for i, layer in enumerate(seqs):
+                print("\n", "=" * 5, "Dis", i, "=" * 5, file=f)
+                layer.sort(key=lambda x: g.nodes[x])
+                for x in layer:
+                    print("%s <- %s"%(g.nodes[x],g.nodes[succ[x]]), file=f)
+
+if __name__ == "__main__":
+    bfs()
+    exit(0)
+
 def pretrain(embedder, actor, optimizer) -> None:
     log("Loading training data")
     graphs, answers = load_graphs()
