@@ -29,11 +29,11 @@ def load_graphs() -> Tuple[List, List]:
                 answers.append([line.strip() for line in f])
             log("graph %s loaded" % test_case)
 
-        if args.dump_graphs:
+        if args.dump_graphs_to:
             import pickle
-            with open(args.dump_validation_set, "wb") as f:
+            with open(args.dump_graphs_to, "wb") as f:
                 pickle.dump((graphs, answers), f)
-            log("dump validation set to %s" % args.dump_graphs)
+            log("dump validation set to %s" % args.dump_graphs_to)
         return graphs, answers
 
 def pretrain(embedder, actor, optimizer) -> None:
