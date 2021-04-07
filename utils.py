@@ -1,4 +1,4 @@
-from typing import List
+from typing import List, Tuple
 import os
 from os.path import join
 
@@ -12,19 +12,34 @@ from itertools import count
 import matplotlib.pyplot as plt
 from collections import defaultdict
 
+def load_graphs() -> Tuple[List, List]:
+    if args.dumped_graphs:
+        import pickle
+        with open(args.dumped_graphs, "rb") as f:
+            return pickle.load(f)
+    else:
+        graphs = []
+        answers = []
+        for test_case in args.graphs:
+            graphs.append(GraphPreprocessor(join(test_case, "cons"),
+                                            join(test_case, "goal"),
+                                            join(test_case, "in"),
+                                            args.device,
+                                            test_case))
+            with open(join(test_case, "ans"), "r") as f:
+                answers.append([line.strip() for line in f])
+            log("graph %s loaded" % test_case)
+
+        if args.dump_graphs_to:
+            import pickle
+            with open(args.dump_validation_set, "wb") as f:
+                pickle.dump((graphs, answers), f)
+            log("dump validation set to %s" % args.dump_graphs_to)
+        return graphs, answers
+
 def pretrain(embedder, actor, optimizer) -> None:
-    graphs = []
-    answers = []
     log("Loading training data")
-    TRAIN_SET_DIR = join("train", args.analysis)
-    for train_data in os.listdir(TRAIN_SET_DIR):
-        graphs.append(GraphPreprocessor(join(TRAIN_SET_DIR, train_data, "cons"),
-                                        join(TRAIN_SET_DIR, train_data, "goal"),
-                                        join(TRAIN_SET_DIR, train_data, "in"),
-                                        args.device,
-                                        train_data))
-        with open(join(TRAIN_SET_DIR, train_data, "ans"), "r") as f:
-            answers.append([line.strip() for line in f])
+    graphs, answers = load_graphs()
     log("Training data loaded")
 
     models = torch.nn.ModuleList([embedder, actor])
@@ -41,7 +56,7 @@ def pretrain(embedder, actor, optimizer) -> None:
             answer = answers[idx]
             graph_embedding = embedder(g)
             # [nodes, HIDDEN]
-            v = actor(graph_embedding)[g.invoke_sites]
+            v = actor(graph_embedding[g.invoke_sites])
             # [invoke_sites, 1]
             ans_tensor = torch.zeros_like(v, dtype=torch.bool)
             weight = len(g.in_set) / len(answer)
@@ -57,7 +72,7 @@ def pretrain(embedder, actor, optimizer) -> None:
             output += (weight_tensor * (ans_tensor + (-v)) ** 2).mean()
 
         log("Epoch", epoch)
-        print("average predict value of postive:  %.4f" % (pos_probs / pos_cnt))
+        print("average predict value of positive: %.4f" % (pos_probs / pos_cnt))
         print("average predict value of negative: %.4f" % (neg_probs / neg_cnt))
         print("loss", output.item())
         if output.item() < 0.1:
@@ -66,36 +81,25 @@ def pretrain(embedder, actor, optimizer) -> None:
         output.backward()
         optimizer.step()
 
-        if epoch % 10 == 0:
-            if not os.path.exists(MODEL_DIR):
-                os.makedirs(MODEL_DIR)
+        if epoch % 50 == 0:
+            os.makedirs(MODEL_DIR, exist_ok=True)
             state_dict = models.state_dict()
             torch.save(state_dict, join(MODEL_DIR, 'model-%s-%d.pth' % (args.analysis, epoch)))
             print("Model saved")
 
-def validate(embedder, actor, test_cases: List[str], evaluate_models: List[str]) -> None:
-    log("Start validation!")
-    graphs  = []
-    answers = []
+def validate(embedder, actor) -> None:
     log("Loading validate data")
-    for test_case in test_cases:
-        graphs.append(GraphPreprocessor(join(test_case, "cons"),
-                                        join(test_case, "goal"),
-                                        join(test_case, "in"),
-                                        args.device,
-                                        test_case))
-        with open(join(test_case, "ans"), "r") as f:
-            answers.append([line.strip() for line in f])
-        log("validate graph %s loaded" % test_case)
+    graphs, answers = load_graphs()
     log("Validate data loaded")
 
     embedder.eval()
     actor.eval()
     models = torch.nn.ModuleList([embedder, actor])
 
+    log("Start validation!")
     with torch.no_grad():
-        d = defaultdict(int)
-        for model in evaluate_models:
+        d_all = defaultdict(lambda: defaultdict(int))
+        for model in args.validate_models:
             checkpoint = torch.load(model)
             models.load_state_dict(checkpoint)
             log(model, "loaded")
@@ -110,8 +114,8 @@ def validate(embedder, actor, test_cases: List[str], evaluate_models: List[str])
                 pos_probs = 0
                 graph_embedding = embedder(graph)
                 # [nodes, HIDDEN]
-                v = actor(graph_embedding)[graph.invoke_sites]
-                for node in ["DenyO(1,1)", "DenyO(1388,1)"]:
+                v = actor(graph_embedding[graph.invoke_sites])
+                for node in ["DenyO(1387,1)", "DenyO(1388,1)"]:
                     print(node, actor(graph_embedding[graph.nodes_dict[node]]))
                     print(node, v[graph.invoke_sites.index(graph.nodes_dict[node])])
                 # [invoke_sites, 1]
@@ -136,18 +140,22 @@ def validate(embedder, actor, test_cases: List[str], evaluate_models: List[str])
                 neg_cnt_all += neg_cnt
 
                 print("finish validating %s" % graph.graph_name)
-                print("average predict value of postive:  %.4f" % (pos_probs / pos_cnt))
+                print("average predict value of positive: %.4f" % (pos_probs / pos_cnt))
                 print("average predict value of negative: %.4f" % (neg_probs / neg_cnt))
                 print("loss", output.item())
+                for x in torch.nonzero(v.reshape(-1) >= 0.7).reshape(-1).tolist():
+                    d_all[graph.graph_name][x] += 1
 
-            for x in torch.nonzero(v.reshape(-1) >= 0.7).reshape(-1).tolist():
-                d[x] += 1
             print("validation for %s finished" % model)
-            print("Overall averate predict value of postive:  %.4f" % (pos_probs_all / pos_cnt_all))
+            print("Overall averate predict value of positive: %.4f" % (pos_probs_all / pos_cnt_all))
             print("Overall averate predict value of negative: %.4f" % (neg_probs_all / neg_cnt_all))
+
             _, axs = plt.subplots(2, 1, sharex=True, tight_layout=True)
             axs[0].hist(pos_val, color='r', range=(0, 1), bins=20)
             axs[1].hist(neg_val, color='b', range=(0, 1), bins=20)
-            plt.savefig(model[model.rfind("/") + 1: -4] + ".png")
-    for idx, cnt in sorted(d.items(), key=lambda x: x[1]):
-        print(graph.nodes[graph.invoke_sites[idx]], cnt)
+            os.makedirs("pics", exist_ok=True)
+            plt.savefig(join("pics", model[model.rfind("/") + 1: -4] + ".png"))
+        for graph_name, d in d_all:
+            print("====%s===="%graph_name)
+            for idx, cnt in sorted(d.items(), key=lambda x: x[1]):
+                print(graph.nodes[graph.invoke_sites[idx]], cnt)
