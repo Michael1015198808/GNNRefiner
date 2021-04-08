@@ -36,7 +36,7 @@ def load_graphs() -> Tuple[List, List]:
             log("dump validation set to %s" % args.dump_graphs_to)
         return graphs, answers
 
-def pretrain(embedder, actor, optimizer) -> None:
+def pretrain(embedder, actor, optimizer, scheduler) -> None:
     log("Loading training data")
     graphs, answers = load_graphs()
     log("Training data loaded")
@@ -79,6 +79,7 @@ def pretrain(embedder, actor, optimizer) -> None:
         optimizer.zero_grad()
         output.backward()
         optimizer.step()
+        scheduler.step()
 
         if epoch % 50 == 0:
             os.makedirs(MODEL_DIR, exist_ok=True)

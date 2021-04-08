@@ -25,6 +25,7 @@ if __name__ == '__main__':
     # critic = nn.Sequential(nn.Linear(HIDDEN, HIDDEN), nn.ReLU(), nn.Linear(HIDDEN, 1))
     models = nn.ModuleList([embedder, actor])
     optimizer = torch.optim.Adam(models.parameters(), lr=args.lr, weight_decay=1e-4) #, momentum=0.5)
+    scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=100, gamma=0.5)
 
     if args.phase == "validate":
         validate(embedder, actor)
@@ -35,7 +36,7 @@ if __name__ == '__main__':
             print("Pretrained model file found. Start with pretrained model")
             models.load_state_dict(checkpoint)
         print("pretrain started")
-        pretrain(embedder, actor, optimizer)
+        pretrain(embedder, actor, optimizer, scheduler)
         print("pretrain finished")
         os.makedirs(MODEL_DIR, exist_ok=True)
         state_dict = models.state_dict()
