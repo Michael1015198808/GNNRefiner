@@ -57,8 +57,9 @@ class GraphPreprocessor(object):
             for tail in tails:
                 tail_idx = self.nodes_dict[tail]
                 tail_type = tail.split("(")[0]
-                edges.append((tail_idx, head_idx))
-                edges_type.append(EDGES_TYPE_DICT[tail_type + ">" + head_type])
+                # edges.append((tail_idx, head_idx))
+                # edges_type.append(EDGES_TYPE_DICT[tail_type + ">" + head_type])
+                # Only keeps backward edges
                 edges.append((head_idx, tail_idx))
                 edges_type.append(EDGES_TYPE_DICT[tail_type + "<" + head_type])
 
