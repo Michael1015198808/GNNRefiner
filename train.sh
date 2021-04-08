@@ -1,6 +1,6 @@
 #!/bin/bash
 
-cmdline="python -u main.py --phase pretrain --layer-dependent --analysis kobj --lr 1e-5";
+cmdline="python -u main.py --phase pretrain --layer-dependent --analysis kobj --lr 5e-4";
 
 GRAPH_BIN="bin/toba-s";
 GRAPH_RAW_DIR="train/kobj/toba-s";

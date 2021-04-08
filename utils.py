@@ -32,7 +32,7 @@ def load_graphs() -> Tuple[List, List]:
 
         if args.dump_graphs_to:
             import pickle
-            with open(args.dump_validation_set, "wb") as f:
+            with open(args.dump_graphs_to, "wb") as f:
                 pickle.dump((graphs, answers), f)
             log("dump validation set to %s" % args.dump_graphs_to)
         return graphs, answers
