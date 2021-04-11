@@ -83,8 +83,12 @@ def pretrain(embedder, actor, optimizer, scheduler) -> None:
 
         if epoch % 50 == 0:
             os.makedirs(MODEL_DIR, exist_ok=True)
-            state_dict = models.state_dict()
-            torch.save(state_dict, join(MODEL_DIR, 'model-%s-%d.pth' % (args.analysis, epoch)))
+            for obj, name in [
+                    (models, 'model'),
+                    (optimizer, 'oppimizer'),
+                    (scheduler, 'scheduler'),
+            ]:
+                torch.save(obj.state_dict(), join(MODEL_DIR, '%s-%s-%d.pth' % (name, args.analysis, epoch)))
             print("Model saved")
 
 def validate(embedder, actor) -> None:
