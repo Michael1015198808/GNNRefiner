@@ -85,7 +85,7 @@ def pretrain(embedder, actor, optimizer, scheduler) -> None:
             os.makedirs(MODEL_DIR, exist_ok=True)
             for obj, name in [
                     (models, 'model'),
-                    (optimizer, 'oppimizer'),
+                    (optimizer, 'optimizer'),
                     (scheduler, 'scheduler'),
             ]:
                 torch.save(obj.state_dict(), join(MODEL_DIR, '%s-%s-%d.pth' % (name, args.analysis, epoch)))
