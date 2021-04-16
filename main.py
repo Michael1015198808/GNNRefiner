@@ -25,7 +25,7 @@ if __name__ == '__main__':
     # critic = nn.Sequential(nn.Linear(HIDDEN, HIDDEN), nn.ReLU(), nn.Linear(HIDDEN, 1))
     models = nn.ModuleList([embedder, actor])
     optimizer = torch.optim.Adam(models.parameters(), lr=args.lr, weight_decay=1e-4) #, momentum=0.5)
-    scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=100, gamma=0.5)
+    scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=20, gamma=0.95)
 
     if args.phase == "validate":
         validate(embedder, actor)
