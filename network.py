@@ -10,9 +10,13 @@ import dgl
 from dgl.nn.pytorch import RelGraphConv
 
 from typing import List
+from cmd_args import args
 
-lrelu = torch.nn.LeakyReLU()
-
+activation_dict = {
+    "tanh": torch.tanh,
+    "lrelu": torch.nn.LeakyReLU,
+}
+activation = activation_dict[args.activation]
 class GCNConv(Module):
     def __init__(self, in_channels, hidden_channels, out_channels, edges_type_cnt):
         super(GCNConv, self).__init__()
@@ -29,7 +33,7 @@ class GCNConv(Module):
         # mid has shape [nodes, HIDDEN]
 
         # Updating nodes' states using previous states(x) and current messages(mid).
-        x = lrelu(self.updating1(torch.cat([x, mid], dim = 1)))
+        x = activation(self.updating1(torch.cat([x, mid], dim = 1)))
         return self.updating2(x)
 
 class Embedding(torch.nn.Module):
@@ -52,7 +56,7 @@ class Embedding(torch.nn.Module):
         # x has shape [nodes, NODE_TYPE_CNT + 2]
 
         # Change point-wise one-hot data into inner representation
-        x = lrelu(self.conv_input(x))
+        x = activation(self.conv_input(x))
         # x has shape [nodes, HIDDEN]
 
         g = dgl.graph((data.edges[0], data.edges[1]))
@@ -60,10 +64,10 @@ class Embedding(torch.nn.Module):
         # Message Passing
         if self.layer_dependent:
             for layer in self.conv_passing:
-                x = lrelu(layer(g, x, data.edges_type))
+                x = activation(layer(g, x, data.edges_type))
         else:
             for i in range(10):
-                x = lrelu(self.conv_passing(g, x, data.edges_type))
+                x = activation(self.conv_passing(g, x, data.edges_type))
 
         return x
 
