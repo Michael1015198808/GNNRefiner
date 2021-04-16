@@ -18,9 +18,11 @@ if __name__ == '__main__':
                          edges_type_cnt=EDGES_TYPE_CNT,
                          device=args.device)
     actor = nn.Sequential(
-            nn.Linear(latent_dim, latent_dim),
-            nn.ReLU(),
-            nn.Linear(latent_dim, 1),
+            nn.Linear(latent_dim, 4 * latent_dim),
+            nn.LeakyReLU(),
+            nn.Linear(4 * latent_dim, 4 * latent_dim),
+            nn.LeakyReLU(),
+            nn.Linear(4 * latent_dim, 1),
             nn.Sigmoid() ).to(args.device)
     # critic = nn.Sequential(nn.Linear(HIDDEN, HIDDEN), nn.ReLU(), nn.Linear(HIDDEN, 1))
     models = nn.ModuleList([embedder, actor])
