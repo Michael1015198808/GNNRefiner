@@ -1,6 +1,6 @@
 #!/bin/bash
 
-cmdline="python -u main.py --phase pretrain --layer-dependent --analysis kobj --lr 2e-4";
+cmdline="python -u main.py --phase pretrain --layer-dependent --analysis kobj --lr 2e-4 $@";
 
 GRAPH_BIN="bin/toba-s";
 GRAPH_RAW_DIR="train/kobj/toba-s";
@@ -11,7 +11,7 @@ then
 else
     if [ -d "$GRAPH_RAW_DIR-0" ]
     then
-        graphs="$cmdline --graphs $(ls -d $GRAPH_RAW_DIR-*) --dump-graphs-to $GRAPH_BIN";
+        cmdline="$cmdline --graphs $(ls -d $GRAPH_RAW_DIR-*) --dump-graphs-to $GRAPH_BIN";
     else
         false;
     fi;
