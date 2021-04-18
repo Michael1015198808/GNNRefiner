@@ -42,7 +42,7 @@ def pretrain(embedder, actor, optimizer, scheduler) -> None:
     log("Training data loaded")
 
     models = torch.nn.ModuleList([embedder, actor])
-    for epoch in count():
+    for epoch in count(scheduler.last_epoch):
         pos_probs = 0
         pos_cnt   = 0
         neg_probs = 0
