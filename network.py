@@ -51,15 +51,13 @@ class Embedding(torch.nn.Module):
             self.conv_passing = GCNConv(hidden_dim, hidden_dim, hidden_dim, edges_type_cnt).to(device)
         # [n, hidden_dim] -> [n, hidden_dim]
 
-    def forward(self, data: GraphPreprocessor):
-        x, nodes_type, edges = data.nodes_fea, data.nodes_type, data.edges
+    def forward(self, g: GraphPreprocessor):
+        x = g.ndata["t"]
         # x has shape [nodes, NODE_TYPE_CNT + 2]
 
         # Change point-wise one-hot data into inner representation
         x = activation(self.conv_input(x))
         # x has shape [nodes, HIDDEN]
-
-        g = dgl.graph((data.edges[0], data.edges[1]))
 
         # Message Passing
         if self.layer_dependent:
