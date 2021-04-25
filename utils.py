@@ -2,6 +2,7 @@ from typing import List, Tuple
 import os
 from os.path import join
 
+import dgl
 import numpy as np
 import torch
 
@@ -11,34 +12,41 @@ from cmd_args import args, MODEL_DIR
 from itertools import count
 import matplotlib.pyplot as plt
 
-def load_graphs() -> Tuple[List, List]:
+def load_graphs() -> Tuple[List, List, List]:
     if args.dumped_graphs:
         import pickle
         with open(args.dumped_graphs, "rb") as f:
             return pickle.load(f)
     else:
         graphs = []
+        blocks_l = []
         answers = []
         for test_case in args.graphs:
-            graphs.append(GraphPreprocessor(join(test_case, "cons"),
-                                            join(test_case, "goal"),
-                                            join(test_case, "in"),
-                                            args.device,
-                                            test_case))
+            g = GraphPreprocessor(join(test_case, "cons"),
+                                  join(test_case, "goal"),
+                                  join(test_case, "in"),
+                                  args.device,
+                                  test_case)
+            graphs.append(g)
             with open(join(test_case, "ans"), "r") as f:
                 answers.append([line.strip() for line in f])
+            sampler = dgl.dataloading.neighbor.MultiLayerNeighborSampler([None] * 10)
+            dataloader = dgl.dataloading.pytorch.NodeDataLoader(g, g.invoke_sites, sampler, batch_size=2000)
+            for input_nodes, output_nodes, blocks in dataloader:
+                pass
+            blocks_l.append(blocks)
             log("graph %s loaded" % test_case)
 
         if args.dump_graphs_to:
             import pickle
             with open(args.dump_graphs_to, "wb") as f:
-                pickle.dump((graphs, answers), f)
+                pickle.dump((graphs, blocks_l, answers), f)
             log("dump validation set to %s" % args.dump_graphs_to)
-        return graphs, answers
+        return graphs, blocks_l, answers
 
 def pretrain(embedder, actor, optimizer, scheduler) -> None:
     log("Loading training data")
-    graphs, answers = load_graphs()
+    graphs, blocks_l, answers = load_graphs()
     log("Training data loaded")
 
     models = torch.nn.ModuleList([embedder, actor])
@@ -52,15 +60,17 @@ def pretrain(embedder, actor, optimizer, scheduler) -> None:
         # for g, answer in zip(graphs, answers):
         for idx in np.random.choice(range(len(graphs)), 5, False):
             g = graphs[idx]
+            blocks = blocks_l[idx]
             answer = answers[idx]
-            graph_embedding = embedder(g)
+            graph_embedding = embedder(blocks)
             # [nodes, HIDDEN]
-            v = actor(graph_embedding[g.invoke_sites])
+            v = actor(graph_embedding)
             # [invoke_sites, 1]
             ans_tensor = torch.zeros_like(v, dtype=torch.bool)
             weight = len(g.in_set) / len(answer)
+            sites_idx = blocks[-1].ndata["_ID"]["_U"].tolist()
             for ans in answer:
-                answer_idx = g.invoke_sites.index(g.nodes_dict[ans])
+                answer_idx = sites_idx.index(g.nodes_dict[ans])
                 ans_tensor[answer_idx] = True
                 pos_probs += v[answer_idx].item()
 
@@ -93,7 +103,7 @@ def pretrain(embedder, actor, optimizer, scheduler) -> None:
 
 def validate(embedder, actor) -> None:
     log("Loading validate data")
-    graphs, answers = load_graphs()
+    graphs, blocks_l, answers = load_graphs()
     log("Validate data loaded")
 
     embedder.eval()
@@ -113,16 +123,17 @@ def validate(embedder, actor) -> None:
             neg_probs_all = 0
             neg_cnt_all = 0
             neg_val = []
-            for graph, answer in zip(graphs, answers):
+            for graph, blocks, answer in zip(graphs, blocks_l, answers):
                 pos_probs = 0
-                graph_embedding = embedder(graph)
+                graph_embedding = embedder(blocks)
                 # [nodes, HIDDEN]
-                v = actor(graph_embedding[graph.invoke_sites])
+                v = actor(graph_embedding)
                 # [invoke_sites, 1]
                 ans_tensor = torch.zeros_like(v, dtype=torch.bool)
                 weight = len(graph.in_set) / len(answer)
+                sites_idx = blocks[-1].ndata["_ID"]["_U"].tolist()
                 for ans in answer:
-                    answer_idx = graph.invoke_sites.index(graph.nodes_dict[ans])
+                    answer_idx = sites_idx.index(graph.nodes_dict[ans])
                     ans_tensor[answer_idx] = True
                     pos_probs += v[answer_idx].item()
 

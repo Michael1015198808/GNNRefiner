@@ -24,17 +24,17 @@ class GCNConv(Module):
         self.updating1 = Linear(in_channels + hidden_channels, 2 * hidden_channels)
         self.updating2 = Linear(in_channels + 2 * hidden_channels, out_channels)
 
-    def forward(self, g, x, edges_type):
+    def forward(self, block, x, edges_type):
         # x has shape [nodes, HIDDEN]
         # edge_index has shape [2, E]
 
         # Calculate massage to pass
-        msg = self.passing(g, x, edges_type)
+        msg = self.passing(block, x, edges_type)
         # mid has shape [nodes, HIDDEN]
-        mid = activation(self.updating1(torch.cat([x, msg], dim=1)))
+        mid = activation(self.updating1(torch.cat([x[block.dstnodes()], msg], dim=1)))
 
         # Updating nodes' states using previous states(x) and current messages(mid).
-        return self.updating2(torch.cat([x, mid], dim=1))
+        return self.updating2(torch.cat([x[block.dstnodes()], mid], dim=1))
 
 class Embedding(torch.nn.Module):
     def __init__(self, feature_cnt: int, edges_type_cnt: int, hidden_dim,
@@ -51,23 +51,21 @@ class Embedding(torch.nn.Module):
             self.conv_passing = GCNConv(hidden_dim, hidden_dim, hidden_dim, edges_type_cnt).to(device)
         # [n, hidden_dim] -> [n, hidden_dim]
 
-    def forward(self, data: GraphPreprocessor):
-        x, nodes_type, edges = data.nodes_fea, data.nodes_type, data.edges
+    def forward(self, blocks):
+        x = blocks[0].srcdata["t"]
         # x has shape [nodes, NODE_TYPE_CNT + 2]
 
         # Change point-wise one-hot data into inner representation
         x = activation(self.conv_input(x))
         # x has shape [nodes, HIDDEN]
 
-        g = dgl.graph((data.edges[0], data.edges[1]))
-
         # Message Passing
         if self.layer_dependent:
-            for layer in self.conv_passing:
-                x = activation(layer(g, x, data.edges_type))
+            for layer, block in zip(self.conv_passing, blocks):
+                x = activation(layer(block, x, block.edata["t"]))
         else:
-            for i in range(10):
-                x = activation(self.conv_passing(g, x, data.edges_type))
+            for block in blocks:
+                x = activation(self.conv_passing(block, x, block.edata["t"]))
 
         return x
 
