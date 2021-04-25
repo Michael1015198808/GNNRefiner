@@ -30,11 +30,12 @@ class GCNConv(Module):
 
         # Calculate massage to pass
         msg = self.passing(block, x, edges_type)
+        dst_x = x[block.dstnodes()]
         # mid has shape [nodes, HIDDEN]
-        mid = activation(self.updating1(torch.cat([x[block.dstnodes()], msg], dim=1)))
+        mid = activation(self.updating1(torch.cat([dst_x, msg], dim=1)))
 
         # Updating nodes' states using previous states(x) and current messages(mid).
-        return self.updating2(torch.cat([x[block.dstnodes()], mid], dim=1))
+        return self.updating2(torch.cat([dst_x, mid], dim=1))
 
 class Embedding(torch.nn.Module):
     def __init__(self, feature_cnt: int, edges_type_cnt: int, hidden_dim,
