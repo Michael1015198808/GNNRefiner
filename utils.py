@@ -33,7 +33,10 @@ def load_graphs() -> Tuple[List, List, List]:
             sampler = dgl.dataloading.neighbor.MultiLayerNeighborSampler([None] * 10)
             dataloader = dgl.dataloading.pytorch.NodeDataLoader(g, g.invoke_sites, sampler, batch_size=2000)
             for input_nodes, output_nodes, blocks in dataloader:
-                pass
+                del blocks[0].dstdata["t"]
+                for block in blocks[1:]:
+                    del block.srcdata["t"]
+                    del block.dstdata["t"]
             blocks_l.append(blocks)
             log("graph %s loaded" % test_case)
 
