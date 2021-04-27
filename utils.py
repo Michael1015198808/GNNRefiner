@@ -87,8 +87,6 @@ def pretrain(embedder, actor, optimizer, scheduler) -> None:
         print("average predict value of positive: %.4f" % (pos_probs / pos_cnt))
         print("average predict value of negative: %.4f" % (neg_probs / neg_cnt))
         print("loss", output.item())
-        if output.item() < 0.1:
-            return
         optimizer.zero_grad()
         output.backward()
         optimizer.step()
