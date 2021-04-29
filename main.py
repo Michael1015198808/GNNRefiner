@@ -18,16 +18,14 @@ if __name__ == '__main__':
                          edges_type_cnt=EDGES_TYPE_CNT,
                          device=args.device)
     actor = nn.Sequential(
-            nn.Linear(latent_dim, 4 * latent_dim),
+            nn.Linear(latent_dim, 2 * latent_dim),
             nn.LeakyReLU(),
-            nn.Linear(4 * latent_dim, 4 * latent_dim),
-            nn.LeakyReLU(),
-            nn.Linear(4 * latent_dim, 1),
-            nn.Sigmoid() ).to(args.device)
+            nn.Linear(2 * latent_dim, 1),
+            ).to(args.device)
     # critic = nn.Sequential(nn.Linear(HIDDEN, HIDDEN), nn.ReLU(), nn.Linear(HIDDEN, 1))
     models = nn.ModuleList([embedder, actor])
     optimizer = torch.optim.Adam(models.parameters(), lr=args.lr, weight_decay=1e-4) #, momentum=0.5)
-    scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=20, gamma=0.95)
+    scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=10, gamma=0.99)
 
     if args.phase == "validate":
         validate(embedder, actor)
