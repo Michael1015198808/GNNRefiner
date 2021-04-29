@@ -54,9 +54,9 @@ def pretrain(embedder, actor, optimizer, scheduler) -> None:
 
     models = torch.nn.ModuleList([embedder, actor])
     for epoch in count(scheduler.last_epoch):
-        pos_probs = 0
+        pos_probs = 0.0
         pos_cnt   = 0
-        neg_probs = 0
+        neg_probs = 0.0
         neg_cnt   = 0
 
         output = torch.tensor(0.0, device=args.device)
@@ -68,20 +68,24 @@ def pretrain(embedder, actor, optimizer, scheduler) -> None:
             graph_embedding = embedder(blocks)
             # [nodes, HIDDEN]
             v = actor(graph_embedding)
+            vv = torch.sigmoid(v)
             # [invoke_sites, 1]
-            ans_tensor = torch.zeros_like(v, dtype=torch.bool)
-            weight = len(g.in_set) / len(answer)
+            ans_tensor = torch.zeros_like(v, dtype=torch.float32)
             sites_idx = blocks[-1].ndata["_ID"]["_U"].tolist()
+            in_tuple_cnt = blocks[-1].num_dst_nodes()
+            weight = 0.1 * in_tuple_cnt / len(answer)
             for ans in answer:
                 answer_idx = sites_idx.index(g.nodes_dict[ans])
-                ans_tensor[answer_idx] = True
-                pos_probs += v[answer_idx].item()
+                ans_tensor[answer_idx] = 1.0
+                pos_probs += vv[answer_idx].item()
 
             pos_cnt += len(answer)
-            neg_cnt += len(g.in_set) - len(answer)
-            neg_probs += v[~ans_tensor].sum().item()
+            neg_cnt += in_tuple_cnt - len(answer)
+            neg_probs += vv.sum()
             weight_tensor = (ans_tensor * weight) + 1
-            output += (weight_tensor * (ans_tensor + (-v)) ** 2).mean()
+            output += torch.nn.functional.binary_cross_entropy_with_logits(v, ans_tensor, weight_tensor, reduction="sum")
+
+        neg_probs -= pos_probs
 
         log("Epoch", epoch)
         print("average predict value of positive: %.4f" % (pos_probs / pos_cnt))
