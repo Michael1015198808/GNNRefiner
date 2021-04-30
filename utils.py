@@ -18,7 +18,6 @@ def load_graphs() -> Tuple[List, List, List]:
         with open(args.dumped_graphs, "rb") as f:
             return pickle.load(f)
     else:
-        graphs = []
         blocks_l = []
         answers = []
         for test_case in args.graphs:
@@ -27,12 +26,12 @@ def load_graphs() -> Tuple[List, List, List]:
                                   join(test_case, "in"),
                                   args.device,
                                   test_case)
-            graphs.append(g)
             with open(join(test_case, "ans"), "r") as f:
-                answers.append([line.strip() for line in f])
+                answers.append([g.nodes_dict[line.strip()] for line in f])
             sampler = dgl.dataloading.neighbor.MultiLayerNeighborSampler([None] * 10)
-            dataloader = dgl.dataloading.pytorch.NodeDataLoader(g, g.invoke_sites, sampler, batch_size=2000)
+            dataloader = dgl.dataloading.pytorch.NodeDataLoader(g, g.invoke_sites, sampler, batch_size=5000)
             for input_nodes, output_nodes, blocks in dataloader:
+                blocks[0].graph_name = test_case
                 del blocks[0].dstdata["t"]
                 for block in blocks[1:]:
                     del block.srcdata["t"]
@@ -43,13 +42,13 @@ def load_graphs() -> Tuple[List, List, List]:
         if args.dump_graphs_to:
             import pickle
             with open(args.dump_graphs_to, "wb") as f:
-                pickle.dump((graphs, blocks_l, answers), f)
+                pickle.dump((blocks_l, answers), f)
             log("dump validation set to %s" % args.dump_graphs_to)
-        return graphs, blocks_l, answers
+        return blocks_l, answers
 
 def pretrain(embedder, actor, optimizer, scheduler) -> None:
     log("Loading training data")
-    graphs, blocks_l, answers = load_graphs()
+    blocks_l, answers = load_graphs()
     log("Training data loaded")
 
     models = torch.nn.ModuleList([embedder, actor])
@@ -61,8 +60,7 @@ def pretrain(embedder, actor, optimizer, scheduler) -> None:
 
         output = torch.tensor(0.0, device=args.device)
         # for g, answer in zip(graphs, answers):
-        for idx in np.random.choice(range(len(graphs)), 5, False):
-            g = graphs[idx]
+        for idx in np.random.choice(range(len(blocks_l)), 5, False):
             blocks = blocks_l[idx]
             answer = answers[idx]
             graph_embedding = embedder(blocks)
@@ -75,7 +73,7 @@ def pretrain(embedder, actor, optimizer, scheduler) -> None:
             in_tuple_cnt = blocks[-1].num_dst_nodes()
             weight = 0.1 * in_tuple_cnt / len(answer)
             for ans in answer:
-                answer_idx = sites_idx.index(g.nodes_dict[ans])
+                answer_idx = sites_idx.index(ans)
                 ans_tensor[answer_idx] = 1.0
                 pos_probs += vv[answer_idx].item()
 
@@ -108,7 +106,7 @@ def pretrain(embedder, actor, optimizer, scheduler) -> None:
 
 def validate(embedder, actor) -> None:
     log("Loading validate data")
-    graphs, blocks_l, answers = load_graphs()
+    blocks_l, answers = load_graphs()
     log("Validate data loaded")
 
     embedder.eval()
@@ -128,34 +126,36 @@ def validate(embedder, actor) -> None:
             neg_probs_all = 0
             neg_cnt_all = 0
             neg_val = []
-            for graph, blocks, answer in zip(graphs, blocks_l, answers):
+            for blocks, answer in zip(blocks_l, answers):
                 pos_probs = 0
                 graph_embedding = embedder(blocks)
                 # [nodes, HIDDEN]
                 v = actor(graph_embedding)
+                vv = torch.sigmoid(v)
                 # [invoke_sites, 1]
-                ans_tensor = torch.zeros_like(v, dtype=torch.bool)
-                weight = len(graph.in_set) / len(answer)
+                ans_tensor = torch.zeros_like(v, dtype=torch.float32)
+                in_tuple_cnt = blocks[-1].num_dst_nodes()
+                weight = 0.1 * in_tuple_cnt / len(answer)
                 sites_idx = blocks[-1].ndata["_ID"]["_U"].tolist()
                 for ans in answer:
-                    answer_idx = sites_idx.index(graph.nodes_dict[ans])
-                    ans_tensor[answer_idx] = True
-                    pos_probs += v[answer_idx].item()
+                    answer_idx = sites_idx.index(ans)
+                    ans_tensor[answer_idx] = 1.0
+                    pos_probs += vv[answer_idx].item()
 
                 pos_cnt = len(answer)
-                pos_val.extend(v[ans_tensor].tolist())
-                neg_cnt = len(graph.in_set) - len(answer)
-                neg_val.extend(v[~ans_tensor].tolist())
-                neg_probs = v[~ans_tensor].sum().item()
+                pos_val.extend(v[ans_tensor > 0.5].tolist())
+                neg_cnt = in_tuple_cnt - len(answer)
+                neg_val.extend(v[ans_tensor < 0.5].tolist())
+                neg_probs = vv.sum() - pos_probs
                 weight_tensor = (ans_tensor * weight) + 1
-                output = (weight_tensor * (ans_tensor + (-v)) ** 2).mean()
+                output = torch.nn.functional.binary_cross_entropy_with_logits(v, ans_tensor, weight_tensor, reduction="sum")
 
                 pos_probs_all += pos_probs
                 pos_cnt_all += pos_cnt
                 neg_probs_all += neg_probs
                 neg_cnt_all += neg_cnt
 
-                print("finish validating %s" % graph.graph_name)
+                print("finish validating %s" % blocks[0].graph_name)
                 print("average predict value of positive: %.4f" % (pos_probs / pos_cnt))
                 print("average predict value of negative: %.4f" % (neg_probs / neg_cnt))
                 print("loss", output.item())
