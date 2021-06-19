@@ -5,6 +5,7 @@ import torch.nn as nn
 import numpy as np
 from utils import pretrain, validate
 
+from logger import log
 from processor import GraphPreprocessor, NODES_TYPE_CNT
 from network import Embedding
 from socket import socket, AF_INET, SOCK_DGRAM
@@ -47,48 +48,63 @@ if __name__ == '__main__':
         os.makedirs(MODEL_DIR, exist_ok=True)
         state_dict = models.state_dict()
         torch.save(state_dict, os.path.join(MODEL_DIR, 'model.pth'))
-        exit(0)
+    elif args.phase == "infer":
+        if args.model:
+            checkpoint = torch.load(args.model)
+            print("Pretrained model file found. Start with pretrained model")
+            models.load_state_dict(checkpoint)
 
-    RLserver = socket(AF_INET, SOCK_DGRAM)
-    RLserver.bind(('', 2021))
-    query_cnt = 0
-    while True:
-        raw_message, clientAddress = RLserver.recvfrom(2048)
-        message = raw_message.decode()
-        if message == "FINISHED":
-            print("Finish solving!")
+            checkpoint = torch.load(args.model.replace("model-", "optimizer-"))
+            optimizer.load_state_dict(checkpoint)
 
-            reward = query_cnt - 0.1
-            loss = -reward * torch.log(prob)[target]
-            optimizer.zero_grad()
-            loss.backward()
-            optimizer.step()
-        elif message == "STARTING":
-            print("Start solving!")
-            query_cnt = 0
-        else:
-            print("Try to solve!")
-            assert message == "SOLVING"
+            checkpoint = torch.load(args.model.replace("model-", "scheduler-"))
+            scheduler.load_state_dict(checkpoint)
+        RLserver = socket(AF_INET, SOCK_DGRAM)
+        RLserver.bind(('', 2021))
+        query_cnt = 0
+        print("ready")
+        while True:
+            raw_message, clientAddress = RLserver.recvfrom(2048)
+            message = raw_message.decode()
+            if message == "FINISHED":
+                print("Finish solving!")
 
-            g = GraphPreprocessor("cons", "goal", "in", args.device)
-
-            # Policy Gradient
-            if query_cnt == 0:
-                query_cnt = len(g.in_set)
-            else:
-                reward = query_cnt - len(g.in_set) - 0.1
-                query_cnt = len(g.in_set)
+                reward = query_cnt - 0.1
                 loss = -reward * torch.log(prob)[target]
                 optimizer.zero_grad()
                 loss.backward()
                 optimizer.step()
+            elif message == "STARTING":
+                print("Start solving!")
+                query_cnt = 0
+            else:
+                log("Try to solve!")
+                assert message == "SOLVING"
 
-            graph_embedding = embedder(g)
-            v = actor(graph_embedding)[g.invoke_sites]
-            prob = torch.softmax(v, dim=0)
-            target = np.random.choice(range(prob.shape[0]), p=prob.detach().numpy()[:, 0])
+                g = GraphPreprocessor("cons", "goal", "in", args.device)
+                log("Graph built")
+                import dgl
+                sampler = dgl.dataloading.neighbor.MultiLayerNeighborSampler([None] * 10)
+                dataloader = dgl.dataloading.pytorch.NodeDataLoader(g, g.invoke_sites, sampler, batch_size=5000)
+                for input_nodes, output_nodes, blocks in dataloader:
+                    del blocks[0].dstdata["t"]
+                    for block in blocks[1:]:
+                        del block.srcdata["t"]
+                        del block.dstdata["t"]
 
-            with open("ans", "w") as f:
-                f.write(g.nodes[g.invoke_sites[target]])
-                print(g.nodes[g.invoke_sites[target]])
-            RLserver.sendto("SOLVED".encode(), clientAddress)
+                log("message passing")
+                with torch.no_grad():
+                    graph_embedding = embedder(blocks)
+                    v = actor(graph_embedding)
+                    l = blocks[-1].ndata["_ID"]["_U"].tolist()
+
+                    log("writing output")
+                    with open("ans", "w") as f:
+                        for index in torch.nonzero(v.reshape(-1) >= 0.5).reshape(-1).tolist():
+                            print(g.nodes_name[l[index]], file=f)
+
+                RLserver.sendto("SOLVED".encode(), clientAddress)
+                log("finished solving")
+
+                # Free some memory
+                del v, l

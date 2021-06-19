@@ -18,13 +18,13 @@ parser.add_argument("--analysis", default="kcfa",
                     choices=["kcfa", "kobj"],
                     help="the analysis to run")
 parser.add_argument("--phase", default="pretrain",
-                    choices=["pretrain", "validate"],
+                    choices=["pretrain", "validate", "infer"],
                     help="the analysis to run")
 parser.add_argument("--layer-dependent", action='store_true',
                     help="use layer (hop) dependent massage passing")
 parser.add_argument("--model", default=None,
                     help="use pretrained model (support full path and relative path)")
-graph_group = parser.add_mutually_exclusive_group(required=True)
+graph_group = parser.add_mutually_exclusive_group(required=False)
 graph_group.add_argument("--graphs", nargs="+", default=None,
                          help="derivation graphs used for pretrain or validation")
 graph_group.add_argument("--dumped-graphs",
