@@ -14,58 +14,50 @@ class GraphPreprocessor(dgl.DGLGraph):
         nodes_type: List[int] = []
         self.nodes_dict:Dict[str, int] = {}
 
-        edges: List[Tuple[int, int]] = []
-
-        self.invoke_sites = []
-        self.in_set = set()
-        with open(in_name, 'r') as f:
-            for line in f.read().splitlines():
-                self.in_set.add(line)
-
-        self.goal_set = set()
-        with open(goal_name, 'r') as f:
-            for line in f.read().splitlines():
-                self.goal_set.add(line)
+        p: List[int] = []
+        q: List[int] = []
 
         cons = []
-        with open(cons_name, 'r') as f:
-            for line in f:
-                line = line.strip()
-                head, tail = line.split(":=")
-                cons.append([head, *tail.split("*")])
-                for term in [head, *tail.split("*")]:
-                    if term not in self.nodes_dict:
-                        self.nodes_dict[term] = nodes_cnt
-                        self.nodes_name.append(term)
-                        nodes_cnt += 1
-                        nodes_type.append(NODES_TYPE_DICT[term.split("(")[0]])
-
+        with open(cons_name.replace("cons", "tuple"), 'r') as f:
+            self.nodes_name = f.read().splitlines()
+        nodes_cnt = len(self.nodes_name)
         nodes_fea = torch.zeros((nodes_cnt, NODES_TYPE_CNT + 2), dtype=torch.float32, device=device)
+        for idx, node in enumerate(self.nodes_name):
+            self.nodes_dict[node] = idx
+            type_idx = NODES_TYPE_DICT[node.split("(")[0]]
+            nodes_type.append(type_idx)
+            nodes_fea[idx][type_idx] = 1
 
-        for line in cons:
-            for term in line:
-                term_idx = self.nodes_dict[term]
-                term_type, _ = term.split("(")
-                nodes_fea[term_idx][NODES_TYPE_DICT[term_type]] = 1
-                if term in self.in_set:
-                    nodes_fea[term_idx][NODES_TYPE_CNT] = 1
-                    self.invoke_sites.append(term_idx)
-                elif term in self.goal_set:
-                    nodes_fea[term_idx][NODES_TYPE_CNT + 1] = 1
+        self.invoke_sites = []
+        with open(in_name, 'r') as f:
+            for line in f.read().splitlines():
+                idx = self.nodes_dict[line]
+                nodes_fea[idx][NODES_TYPE_CNT] = 1
+                self.invoke_sites.append(idx)
 
-            head, *tails = line
-            head_idx = self.nodes_dict[head]
-            head_type = head.split("(")[0]
-            for tail in tails:
-                tail_idx = self.nodes_dict[tail]
-                tail_type = tail.split("(")[0]
-                edges.append((tail_idx, head_idx))
-                edges_type.append(EDGES_TYPE_DICT[tail_type + ">" + head_type])
-                edges.append((head_idx, tail_idx))
-                edges_type.append(EDGES_TYPE_DICT[tail_type + "<" + head_type])
+        with open(goal_name, 'r') as f:
+            for line in f.read().splitlines():
+                idx = self.nodes_dict[line]
+                nodes_fea[idx][NODES_TYPE_CNT + 1] = 1
 
-        p, q = zip(*edges)
+        with open(cons_name, 'r') as f:
+            for line in f.read().splitlines():
+                head, tails = line.split(":=", 1)
+                tails = tails.split("*")
+                head_idx = self.nodes_dict[head]
+                head_type = head.split("(")[0]
+                for tail in tails:
+                    tail_idx = self.nodes_dict[tail]
+                    tail_type = tail.split("(")[0]
+                    p.append(tail_idx)
+                    q.append(head_idx)
+                    edges_type.append(EDGES_TYPE_DICT[tail_type + ">" + head_type])
+                    p.append(head_idx)
+                    q.append(tail_idx)
+                    edges_type.append(EDGES_TYPE_DICT[tail_type + "<" + head_type])
+
         super(GraphPreprocessor, self).__init__((p, q), num_nodes=nodes_cnt)
+
         self.ndata["t"] = nodes_fea
         self.nodes_type = torch.tensor(nodes_type, device=device)
         self.edata["t"] = torch.tensor(edges_type, device=device)
