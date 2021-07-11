@@ -35,10 +35,12 @@ class GraphPreprocessor(dgl.DGLGraph):
                 nodes_fea[idx][NODES_TYPE_CNT] = 1
                 self.invoke_sites.append(idx)
 
+        self.goals = []
         with open(goal_name, 'r') as f:
             for line in f.read().splitlines():
                 idx = self.nodes_dict[line]
                 nodes_fea[idx][NODES_TYPE_CNT + 1] = 1
+                self.goals.append(idx)
 
         with open(cons_name, 'r') as f:
             for line in f.read().splitlines():
@@ -61,7 +63,9 @@ class GraphPreprocessor(dgl.DGLGraph):
         self.ndata["t"] = nodes_fea
         self.nodes_type = torch.tensor(nodes_type, device=device)
         self.edata["t"] = torch.tensor(edges_type, device=device)
+        '''
         if self.graph_name:
             print(self.graph_name)
         print(nodes_cnt, "nodes.")
-        print(len(edges), "edges.")
+        print(len(p), "edges.")
+        '''
