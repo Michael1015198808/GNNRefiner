@@ -24,13 +24,16 @@ class GCNConv(Module):
         self.updating1 = Linear(in_channels + hidden_channels, 2 * hidden_channels)
         self.updating2 = Linear(in_channels + 2 * hidden_channels, out_channels)
 
-    def forward(self, block, x, edges_type):
+    def forward(self, block, x, edges_type, is_block):
         # x has shape [nodes, HIDDEN]
         # edge_index has shape [2, E]
 
         # Calculate massage to pass
         msg = self.passing(block, x, edges_type)
-        dst_x = x[block.dstnodes()]
+        if is_block:
+            dst_x = x[block.dstnodes()]
+        else:
+            dst_x = x
         # mid has shape [nodes, HIDDEN]
         mid = activation(self.updating1(torch.cat([dst_x, msg], dim=1)))
 
@@ -52,21 +55,29 @@ class Embedding(torch.nn.Module):
             self.conv_passing = GCNConv(hidden_dim, hidden_dim, hidden_dim, edges_type_cnt).to(device)
         # [n, hidden_dim] -> [n, hidden_dim]
 
-    def forward(self, blocks):
-        x = blocks[0].srcdata["t"]
+    def forward(self, g, is_block):
+        if is_block:
+            x = g[0].srcdata["t"]
+        else:
+            x = g.ndata["t"]
         # x has shape [nodes, NODE_TYPE_CNT + 2]
 
         # Change point-wise one-hot data into inner representation
         x = activation(self.conv_input(x))
         # x has shape [nodes, HIDDEN]
+        if is_block:
+            blocks = g
+        else:
+            from itertools import repeat
+            blocks = repeat(g)
 
         # Message Passing
         if self.layer_dependent:
             for layer, block in zip(self.conv_passing, blocks):
-                x = activation(layer(block, x, block.edata["t"]))
+                x = activation(layer(block, x, block.edata["t"], is_block))
         else:
-            for block in blocks:
-                x = activation(self.conv_passing(block, x, block.edata["t"]))
+            for block in g:
+                x = activation(self.conv_passing(block, x, block.edata["t"], is_block))
 
         return x
 
