@@ -35,6 +35,8 @@ parser.add_argument("--validate-models", nargs="+", default=None,
                     help="models used for validation")
 parser.add_argument("--lr", "--learning-rate", type=float, default=1e-3,
                     help="learning rate of neural network")
+parser.add_argument("--beta", type=float, default=1.0,
+                    help="parameter for importance sampling.")
 parser.add_argument("--hide-args", action='store_true',
                     help="hide result of argument parsing")
 parser.add_argument("--activation", default="tanh",
@@ -48,6 +50,7 @@ if not args.hide_args:
 device = torch.device(args.device)
 latent_dim = args.latent_dim
 analysis = args.analysis
+beta = args.beta
 MODEL_DIR = "models"
 
 with open(os.path.join("data", analysis, "nodes_type_dict"), "r") as f:

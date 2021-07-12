@@ -8,7 +8,7 @@ import torch
 
 from processor import GraphPreprocessor
 from logger import log
-from cmd_args import args, MODEL_DIR
+from cmd_args import args, MODEL_DIR, beta
 from itertools import count
 import matplotlib.pyplot as plt
 
@@ -60,7 +60,7 @@ def pretrain(embedder, actor, optimizer, scheduler) -> None:
 
         output = torch.tensor(0.0, device=args.device)
         # for g, answer in zip(graphs, answers):
-        for idx in np.random.choice(range(len(blocks_l)), 5, False):
+        for idx in np.random.choice(range(len(blocks_l)), 1, False):
             blocks = blocks_l[idx]
             answer = answers[idx]
             graph_embedding = embedder(blocks)
@@ -71,7 +71,7 @@ def pretrain(embedder, actor, optimizer, scheduler) -> None:
             ans_tensor = torch.zeros_like(v, dtype=torch.float32)
             sites_idx = blocks[-1].ndata["_ID"]["_U"].tolist()
             in_tuple_cnt = blocks[-1].num_dst_nodes()
-            weight = 0.1 * in_tuple_cnt / len(answer)
+            weight = beta * (in_tuple_cnt - len(answer)) / len(answer)
             for ans in answer:
                 answer_idx = sites_idx.index(ans)
                 ans_tensor[answer_idx] = 1.0
@@ -135,7 +135,7 @@ def validate(embedder, actor) -> None:
                 # [invoke_sites, 1]
                 ans_tensor = torch.zeros_like(v, dtype=torch.float32)
                 in_tuple_cnt = blocks[-1].num_dst_nodes()
-                weight = 0.1 * in_tuple_cnt / len(answer)
+                weight = beta * (in_tuple_cnt - len(answer)) / len(answer)
                 sites_idx = blocks[-1].ndata["_ID"]["_U"].tolist()
                 for ans in answer:
                     answer_idx = sites_idx.index(ans)
