@@ -67,6 +67,9 @@ if __name__ == '__main__':
             checkpoint = torch.load(args.model.replace("model-", "optimizer-"))
             optimizer.load_state_dict(checkpoint)
 
+            for param_group in optimizer.param_groups:
+                param_group["lr"] = args.lr
+
             # checkpoint = torch.load(args.model.replace("model-", "scheduler-"))
             # scheduler.load_state_dict(checkpoint)
 
@@ -75,6 +78,10 @@ if __name__ == '__main__':
 
             # checkpoint = torch.load("models/critic-op-kobj.pth")
             # critic_optimizer.load_state_dict(checkpoint)
+        else:
+            print("No model given. Start with random model dumped.")
+            torch.save(models.state_dict(), os.path.join(MODEL_DIR, "model-%s-0.pth" % args.analysis))
+            torch.save(optimizer.state_dict(), os.path.join(MODEL_DIR, "optimizer-%s-0.pth" % args.analysis))
 
         RLserver = socket(AF_INET, SOCK_DGRAM)
         RLserver.bind(('', 2021))
