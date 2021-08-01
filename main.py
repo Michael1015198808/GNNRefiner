@@ -86,6 +86,33 @@ if __name__ == '__main__':
         RLserver = socket(AF_INET, SOCK_DGRAM)
         RLserver.bind(('', 2021))
         print("ready")
+
+        if args.phase == "infer":
+            for timestamp in count(1):
+                raw_message, clientAddress = RLserver.recvfrom(2048)
+                assert raw_message.decode() == "STARTING"
+                for it_count in count():
+                    raw_message, clientAddress = RLserver.recvfrom(2048)
+                    message = raw_message.decode()
+                    if message == "SOLVING":
+                        with torch.no_grad():
+                            g = GraphPreprocessor("cons", "goal", "in", args.device)
+                            graph_embedding = embedder(g, False)
+                            v = actor(graph_embedding[g.invoke_sites]).reshape(-1)
+                            action = (epsilon + (1 - epsilon * 2) * v) >= torch.rand_like(v)
+                            print("%d: %d/%d(%.3f)" % (it_count, action.sum(), len(g.invoke_sites), action.sum() / len(g.invoke_sites)))
+
+
+                            with open("ans", "w") as f:
+                                for index in torch.nonzero(action).reshape(-1).tolist():
+                                    print(g.nodes_name[g.invoke_sites[index]], file=f)
+
+                            RLserver.sendto("SOLVED".encode(), clientAddress)
+                    else:
+                        print(message)
+                        assert message == "FINISHED"
+                        break
+
         t_all_l = []
         for timestamp in count(1):
             raw_message, clientAddress = RLserver.recvfrom(2048)
@@ -131,9 +158,37 @@ if __name__ == '__main__':
                         critic_loss = (prev_state_value - t - state_value) ** 2
 
                         optimizer.zero_grad()
-                        loss = actor_loss + critic_loss * 0.05
+                        cheat_loss = 0.0
+                        cnt = 0
+                        for denyo_idx in [2, 4, 6, 12]:
+                            denyo_tuple = "DenyO(" + str(denyo_idx) + ",1)"
+                            if denyo_tuple in g.nodes_dict:
+                                cnt += 1
+                                print(denyo_tuple, end=" ")
+                                cheat_loss -= 10 * v[g.invoke_sites.index(g.nodes_dict[denyo_tuple])]
+                        if cnt != 0:
+                            print()
+                            cheat_loss /= cnt
+                        loss = actor_loss + cheat_loss + critic_loss * 0.05
                         loss.backward()
                         optimizer.step()
+                    else:
+                        graph_embedding = embedder(g, False)
+                        v = actor(graph_embedding[g.invoke_sites]).reshape(-1)
+                        loss = v.sum()
+                        cheat_loss = 0.0
+                        cnt = 0
+                        for denyo_idx in [2, 4, 6, 12]:
+                            denyo_tuple = "DenyO(" + str(denyo_idx) + ",1)"
+                            if denyo_tuple in g.nodes_dict:
+                                print(denyo_tuple, end=" ")
+                                cheat_loss -= 10 * v[g.invoke_sites.index(g.nodes_dict[denyo_tuple])]
+                        if cnt != 0:
+                            print()
+                            cheat_loss /= cnt
+                            optimizer.zero_grad()
+                            cheat_loss.backward()
+                            optimizer.step()
 
                     if message =="FINISHED":
                         t_all_l.append(t_all)
