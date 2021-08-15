@@ -10,6 +10,10 @@ parser = argparse.ArgumentParser(description="A naïve GNN-based abstraction ref
                                  formatter_class=argparse.ArgumentDefaultsHelpFormatter,
                                  allow_abbrev=False)
 
+parser.add_argument("--port", type=int, default=2021,
+                    help="working port.")
+parser.add_argument("--work-dir", default=".",
+                    help="working directory.")
 parser.add_argument("--device", default="cpu",
                     help="device to run GNN.")
 parser.add_argument("--latent-dim", type=int, default=32,
@@ -18,7 +22,7 @@ parser.add_argument("--analysis", default="kcfa",
                     choices=["kcfa", "kobj"],
                     help="the analysis to run")
 parser.add_argument("--phase", default="pretrain",
-                    choices=["pretrain", "validate", "infer"],
+                    choices=["pretrain", "validate", "infer", "RL"],
                     help="the analysis to run")
 parser.add_argument("--layer-dependent", action='store_true',
                     help="use layer (hop) dependent massage passing")

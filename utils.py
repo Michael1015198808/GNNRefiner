@@ -60,13 +60,12 @@ def pretrain(embedder, actor, optimizer, scheduler) -> None:
 
         output = torch.tensor(0.0, device=args.device)
         # for g, answer in zip(graphs, answers):
-        for idx in np.random.choice(range(len(blocks_l)), 1, False):
+        for idx in np.random.choice(range(len(blocks_l)), 5, False):
             blocks = blocks_l[idx]
             answer = answers[idx]
-            graph_embedding = embedder(blocks)
+            graph_embedding = embedder(blocks, True)
             # [nodes, HIDDEN]
             v = actor(graph_embedding)
-            vv = torch.sigmoid(v)
             # [invoke_sites, 1]
             ans_tensor = torch.zeros_like(v, dtype=torch.float32)
             sites_idx = blocks[-1].ndata["_ID"]["_U"].tolist()
@@ -75,13 +74,13 @@ def pretrain(embedder, actor, optimizer, scheduler) -> None:
             for ans in answer:
                 answer_idx = sites_idx.index(ans)
                 ans_tensor[answer_idx] = 1.0
-                pos_probs += vv[answer_idx].item()
+                pos_probs += v[answer_idx].item()
 
             pos_cnt += len(answer)
             neg_cnt += in_tuple_cnt - len(answer)
-            neg_probs += vv.sum()
+            neg_probs += v.sum()
             weight_tensor = (ans_tensor * weight) + 1
-            output += torch.nn.functional.binary_cross_entropy_with_logits(v, ans_tensor, weight_tensor, reduction="sum")
+            output += torch.nn.functional.binary_cross_entropy(v, ans_tensor, weight_tensor, reduction="sum")
 
         neg_probs -= pos_probs
 
@@ -128,10 +127,9 @@ def validate(embedder, actor) -> None:
             neg_val = []
             for blocks, answer in zip(blocks_l, answers):
                 pos_probs = 0
-                graph_embedding = embedder(blocks)
+                graph_embedding = embedder(blocks, True)
                 # [nodes, HIDDEN]
                 v = actor(graph_embedding)
-                vv = torch.sigmoid(v)
                 # [invoke_sites, 1]
                 ans_tensor = torch.zeros_like(v, dtype=torch.float32)
                 in_tuple_cnt = blocks[-1].num_dst_nodes()
@@ -140,13 +138,13 @@ def validate(embedder, actor) -> None:
                 for ans in answer:
                     answer_idx = sites_idx.index(ans)
                     ans_tensor[answer_idx] = 1.0
-                    pos_probs += vv[answer_idx].item()
+                    pos_probs += v[answer_idx].item()
 
                 pos_cnt = len(answer)
                 pos_val.extend(v[ans_tensor > 0.5].tolist())
                 neg_cnt = in_tuple_cnt - len(answer)
                 neg_val.extend(v[ans_tensor < 0.5].tolist())
-                neg_probs = vv.sum() - pos_probs
+                neg_probs = v.sum() - pos_probs
                 weight_tensor = (ans_tensor * weight) + 1
                 output = torch.nn.functional.binary_cross_entropy_with_logits(v, ans_tensor, weight_tensor, reduction="sum")
 
