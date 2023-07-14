@@ -1,3 +1,8 @@
+import resource
+
+# resource.setrlimit(resource.RLIMIT_AS, (1024 * 1024 * 1024 * 256, 1024 * 1024 * 1024 * 256))
+
+import json
 import pickle
 from itertools import count
 import os
@@ -12,7 +17,7 @@ from processor import GraphPreprocessor, NODES_TYPE_CNT
 from network import Embedding
 from socket import socket, AF_INET, SOCK_DGRAM
 
-from cmd_args import args, MODEL_DIR, EDGES_TYPE_CNT, latent_dim, epsilon
+from cmd_args import args, MODEL_DIR, EDGES_TYPE_DICT, EDGES_TYPE_CNT, latent_dim, epsilon
 
 if __name__ == '__main__':
     # networks
@@ -25,13 +30,8 @@ if __name__ == '__main__':
             nn.LeakyReLU(),
             nn.Linear(2 * latent_dim, 1),
             ).to(args.device)
-    critic = nn.Sequential(
-            nn.Linear(latent_dim, 2 * latent_dim),
-            nn.LeakyReLU(),
-            nn.Linear(2 * latent_dim, 1),
-            ).to(args.device)
-    models = nn.ModuleList([embedder, actor, critic])
-    optimizer = torch.optim.Adam(models.parameters(), lr=args.lr, weight_decay=1e-5) #, momentum=0.5)
+    models = nn.ModuleList([embedder, actor])
+    optimizer = torch.optim.Adam(models.parameters(), lr=args.lr, weight_decay=5e-4) #, momentum=0.5)
     scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer, gamma=0.9995)
     os.makedirs(MODEL_DIR, exist_ok=True)
 
@@ -55,20 +55,19 @@ if __name__ == '__main__':
         state_dict = models.state_dict()
         torch.save(state_dict, os.path.join(MODEL_DIR, 'model.pth'))
     else:
-        from time import time
-
         if args.model:
             checkpoint = torch.load(args.model)
             print("Pretrained model file found. Start with pretrained model")
-            models.load_state_dict(checkpoint, strict=False)
+            # models.load_state_dict(checkpoint, strict=False)
+            models.load_state_dict(checkpoint)
 
-            checkpoint = torch.load(args.model.replace("model-", "optimizer-"))
-            optimizer.load_state_dict(checkpoint)
+            # checkpoint = torch.load(args.model.replace("model-", "optimizer-"))
+            # optimizer.load_state_dict(checkpoint)
 
             # for param_group in optimizer.param_groups:
             #     param_group["lr"] = args.lr
 
-            checkpoint = torch.load(args.model.replace("model-", "scheduler-"))
+            # checkpoint = torch.load(args.model.replace("model-", "scheduler-"))
             scheduler.load_state_dict(checkpoint)
 
             # checkpoint = torch.load("models/critic-kobj.pth")
@@ -87,12 +86,17 @@ if __name__ == '__main__':
         print("ready")
 
         if args.phase == "infer":
+            flag = True
             for timestamp in count(1):
-                raw_message, clientAddress = RLserver.recvfrom(2048)
-                assert raw_message.decode() == "STARTING"
+                if flag:
+                    raw_message, clientAddress = RLserver.recvfrom(2048)
+                    assert raw_message.decode() == "STARTING", f"received {raw_message.decode()}, expect \"STARTING\""
+                flag = True
                 chosen = []
                 for it_count in count():
                     raw_message, clientAddress = RLserver.recvfrom(2048)
+                    with open(os.path.join(args.work_dir, "address"), "w") as f:
+                        json.dump(clientAddress, f)
                     message = raw_message.decode()
                     if message == "SOLVING":
                         with torch.no_grad():
@@ -100,14 +104,16 @@ if __name__ == '__main__':
                                                   os.path.join(args.work_dir, "goal"),
                                                   os.path.join(args.work_dir, "in"),
                                                   args.device)
-                            print(g.num_nodes())
-                            if g.num_nodes() > 80_000_000:
+                            print(g.g.num_nodes())
+                            if g.g.num_nodes() > 80_000_000:
                                 print("Graph too large!")
                                 RLserver.sendto("CLOSED".encode(), clientAddress)
                                 break
-                            graph_embedding = embedder(g, False)
-                            v = actor(graph_embedding[g.invoke_sites]).reshape(-1)
+                            graph_embedding = embedder(g.g)
+                            v = actor(graph_embedding[g.invoke_sites]).reshape(-1).sigmoid()
+                            print(v.mean(), v.min(), v.max())
                             # action = (epsilon + (1 - epsilon * 2) * v) >= torch.rand_like(v)
+                            assert v.grad_fn == None and not v.requires_grad
                             action = v >= 0.5
                             print("%d: %d/%d(%.3f)" % (it_count, action.sum(), len(g.invoke_sites), action.sum() / len(g.invoke_sites)))
 
@@ -119,6 +125,9 @@ if __name__ == '__main__':
                                 chosen.append(s)
 
                             RLserver.sendto("SOLVED".encode(), clientAddress)
+                    elif message == "STARTING":
+                        flag = False
+                        break
                     else:
                         print(message)
                         assert message == "FINISHED"
@@ -132,7 +141,7 @@ if __name__ == '__main__':
         loss_cnt = defaultdict(int)
         loss_sum = defaultdict(float)
         for timestamp in count(scheduler.last_epoch + 1):
-            print("The %d-th round starts!" % timestamp)
+            log("The %d-th round starts!" % timestamp)
             it_sum = 0
             reward_sum = 0
             proven_sum = 0
@@ -140,6 +149,7 @@ if __name__ == '__main__':
                 raw_message, clientAddress = RLserver.recvfrom(2048)
                 message = raw_message.decode()
 
+                print(message)
                 assert message == "STARTING"
                 rs = []
                 graphs = []
@@ -174,112 +184,36 @@ if __name__ == '__main__':
                                               os.path.join(args.work_dir, "goal"),
                                               os.path.join(args.work_dir, "in"),
                                               args.device)
-                        if it_count == 0 and timestamp == 1:
+                        if it_count == 0 and timestamp == 1 and False:
                             print("Initialization!")
-                            pre_optimizer = torch.optim.Adam(models.parameters(), lr=args.lr, weight_decay=1e-5) #, momentum=0.5)
+                            pre_optimizer = torch.optim.Adam(models.parameters(), lr=args.lr, weight_decay=5e-5) #, momentum=0.5)
                             y1 = torch.ones(len(g.invoke_sites), dtype=torch.float32) * 0.1
-                            y1[g.invoke_sites.index(g.nodes_dict["DenyO(1,1)"])] = 0.6
-                            y1[g.invoke_sites.index(g.nodes_dict["DenyO(4,1)"])] = 0.6
-                            y1[g.invoke_sites.index(g.nodes_dict["DenyO(7,1)"])] = 0.6
-                            y1[g.invoke_sites.index(g.nodes_dict["DenyO(8,1)"])] = 0.6
-                            y1[g.invoke_sites.index(g.nodes_dict["DenyO(12,1)"])] = 0.6
-                            y1[g.invoke_sites.index(g.nodes_dict["DenyO(13,1)"])] = 0.6
-                            y1[g.invoke_sites.index(g.nodes_dict["DenyO(14,1)"])] = 0.6
-                            y1[g.invoke_sites.index(g.nodes_dict["DenyO(15,1)"])] = 0.62
-                            # y[g.invoke_sites.index(g.nodes_dict["DenyH(8,2)"])] = 0.6
-                            # y = torch.ones(9, dtype=torch.float32)
-                            # y[g.invoke_sites.index(g.nodes_dict["DenyO(3,1)"])] = -3.5
-                            # y[g.invoke_sites.index(g.nodes_dict["DenyO(4,1)"])] = -3.5
+                            y1[g.invoke_sites.index(g.nodes_dict["DenyO(1,1)"])] = 0.8
 
                             with open(os.path.join(args.work_dir, "ans"), "w") as f:
                                 print("DenyO(1,1)", file=f)
-                                print("DenyO(4,1)", file=f)
-
-                            RLserver.sendto("SOLVED".encode(), clientAddress)
-                            raw_message, clientAddress = RLserver.recvfrom(2048)
-                            message = raw_message.decode()
-                            g2 = GraphPreprocessor(os.path.join(args.work_dir, "cons"),
-                                                  os.path.join(args.work_dir, "goal"),
-                                                  os.path.join(args.work_dir, "in"),
-                                                  args.device)
-                            y2 = torch.ones(len(g2.invoke_sites), dtype=torch.float32) * 0.1
-                            y2[g2.invoke_sites.index(g2.nodes_dict["DenyH(7,2)"])] = 0.6
-                            y2[g2.invoke_sites.index(g2.nodes_dict["DenyH(8,2)"])] = 0.6
-                            y2[g2.invoke_sites.index(g2.nodes_dict["DenyH(12,2)"])] = 0.6
-                            y2[g2.invoke_sites.index(g2.nodes_dict["DenyH(13,2)"])] = 0.6
-                            y2[g2.invoke_sites.index(g2.nodes_dict["DenyH(14,2)"])] = 0.6
-                            y2[g2.invoke_sites.index(g2.nodes_dict["DenyH(15,2)"])] = 0.62
-                            y2[g2.invoke_sites.index(g2.nodes_dict["DenyO(7,1)"])] = 0.6
-                            y2[g2.invoke_sites.index(g2.nodes_dict["DenyO(8,1)"])] = 0.6
-                            y2[g2.invoke_sites.index(g2.nodes_dict["DenyO(12,1)"])] = 0.6
-                            y2[g2.invoke_sites.index(g2.nodes_dict["DenyO(13,1)"])] = 0.6
-                            y2[g2.invoke_sites.index(g2.nodes_dict["DenyO(14,1)"])] = 0.6
-                            y2[g2.invoke_sites.index(g2.nodes_dict["DenyO(15,1)"])] = 0.62
-
-                            with open(os.path.join(args.work_dir, "ans"), "w") as f:
-                                print("DenyH(7,2)", file=f)
-
-                            RLserver.sendto("SOLVED".encode(), clientAddress)
-                            raw_message, clientAddress = RLserver.recvfrom(2048)
-                            message = raw_message.decode()
-                            g3 = GraphPreprocessor(os.path.join(args.work_dir, "cons"),
-                                                  os.path.join(args.work_dir, "goal"),
-                                                  os.path.join(args.work_dir, "in"),
-                                                  args.device)
-                            y3 = torch.ones(len(g3.invoke_sites), dtype=torch.float32) * 0.1
-                            y3[g3.invoke_sites.index(g3.nodes_dict["DenyH(8,2)"])] = 0.6
-                            y3[g3.invoke_sites.index(g3.nodes_dict["DenyH(12,2)"])] = 0.6
-                            y3[g3.invoke_sites.index(g3.nodes_dict["DenyH(13,2)"])] = 0.6
-                            y3[g3.invoke_sites.index(g3.nodes_dict["DenyH(14,2)"])] = 0.6
-                            y3[g3.invoke_sites.index(g3.nodes_dict["DenyH(15,2)"])] = 0.62
-                            y3[g3.invoke_sites.index(g3.nodes_dict["DenyO(8,1)"])] = 0.6
-                            y3[g3.invoke_sites.index(g3.nodes_dict["DenyO(12,1)"])] = 0.6
-                            y3[g3.invoke_sites.index(g3.nodes_dict["DenyO(13,1)"])] = 0.6
-                            y3[g3.invoke_sites.index(g3.nodes_dict["DenyO(14,1)"])] = 0.6
-                            y3[g3.invoke_sites.index(g3.nodes_dict["DenyO(15,1)"])] = 0.62
-                            with open(os.path.join(args.work_dir, "ans"), "w") as f:
-                                print("DenyH(15,2)", file=f)
-
-                            RLserver.sendto("SOLVED".encode(), clientAddress)
-                            raw_message, clientAddress = RLserver.recvfrom(2048)
-                            message = raw_message.decode()
-
-                            print(g.goals)
-                            print(g2.goals)
-                            print(g3.goals)
 
                             for pre_count in count():
-                                g1_embedding = embedder(g, False)
+                                g1_embedding = embedder(g)
                                 v1 = actor(g1_embedding[g.invoke_sites]).reshape(-1)
                                 p1 = v1.sigmoid()
                                 v1_est = critic(g1_embedding[g.goals].sum(0))
 
-                                g2_embedding = embedder(g2, False)
-                                v2 = actor(g2_embedding[g2.invoke_sites]).reshape(-1)
-                                p2 = v2.sigmoid()
-                                v2_est = critic(g2_embedding[g2.goals].sum(0))
-
-                                g3_embedding = embedder(g3, False)
-                                v3 = actor(g3_embedding[g3.invoke_sites]).reshape(-1)
-                                p3 = v3.sigmoid()
-                                v3_est = critic(g3_embedding[g3.goals].sum(0))
-
-                                loss  = ((y1 - p1) ** 2).sum() * 1e2 + (1.5 - v1_est) ** 2
-                                loss += ((y2 - p2) ** 2).sum() * 1e2 + (2.0 - v2_est) ** 2
-                                loss += ((y3 - p3) ** 2).sum() * 1e2 + (1.0 - v3_est) ** 2
+                                loss  = ((y1 - p1) ** 2).sum() * 1e2 + (0.5 - v1_est) ** 2
                                 pre_optimizer.zero_grad()
                                 loss.backward()
                                 pre_optimizer.step()
                                 if pre_count % 10 == 0:
                                     print("%04d: %f %f(%f) %f(%f)" % (pre_count, v1_est, p1.max(), v1.max(), p1.min(), v1.min()))
-                                    print("    : %f %f(%f) %f(%f)" % (           v2_est, p2.max(), v2.max(), p2.min(), v2.min()))
-                                    print("    : %f %f(%f) %f(%f)" % (           v3_est, p3.max(), v3.max(), p3.min(), v3.min()))
                                     if pre_count % 200 == 0:
                                         print("<-g1->")
                                         for i, prob in enumerate(p1):
                                             print("%s: %.8f" % (g.nodes_name[g.invoke_sites[i]], prob))
-                                if abs(v1_est - 1.5) < 0.05 and (p1 - y1).abs().max() < 0.02 and abs(v2_est - 2.0) < 0.05 and (p2 - y2).abs().max() < 0.02 and abs(v3_est - 1.0) < 0.05 and (p3 - y3).abs().max() < 0.02:
+                                if abs(v1_est - 0.5) < 0.05 and (p1 - y1).abs().max() < 0.02:
                                     break
+                            RLserver.sendto("SOLVED%d".encode(), clientAddress)
+                            raw_message, clientAddress = RLserver.recvfrom(2048)
+                            message = raw_message.decode()
                             continue
 
                         graphs.append(g)
@@ -290,10 +224,10 @@ if __name__ == '__main__':
                             break
 
                         with torch.no_grad():
-                            graph_embedding = embedder(g, False)
+                            graph_embedding = embedder(g)[0]
                             v = actor(graph_embedding[g.invoke_sites]).reshape(-1)
-                            p = v.sigmoid()
-                            # p = v.sigmoid() * 0.99 + 0.01 / v.shape[0]
+                            # p = v.sigmoid()
+                            p = v.sigmoid() * 0.99 + 0.01
                             if it_count == 0:
                                 print("max: %.8f min: %.8f" % (p.max(), p.min()))
                                 # v[g.invoke_sites.index(g.nodes_dict[special])] += 2.0
@@ -321,24 +255,26 @@ if __name__ == '__main__':
                 proven_sum += cur_proven
 
                 print("training: ")
-                cumulative_r = 0
-                for r in reversed(rs):
-                    cumulative_r = cumulative_r * 0.8 + r
+                # cumulative_r = 0
+                # for r in reversed(rs):
+                #     cumulative_r = cumulative_r * 0.8 + r
+                cumulative_r = sum(rs)
                 loss = 0.0
                 vs = []
                 for g, action, reward in zip(graphs, actions, rs):
-                    cumulative_r = (cumulative_r - reward) / 0.8
+                    # cumulative_r = (cumulative_r - reward) / 0.8
+                    cumulative_r -= reward
                 # cumulative_r = 0
                 # for g, action, reward in zip(reversed(graphs), reversed(actions), reversed(rs)):
                 #     cumulative_r = cumulative_r * 0.9 + reward
-                    graph_embedding = embedder(g, False)
+                    graph_embedding = embedder(g)[0]
                     v = actor(graph_embedding[g.invoke_sites]).reshape(-1)
-                    v_est = critic(graph_embedding[g.goals].sum(0))
+                    v_est = critic(critic_embedder(g, False)[0][g.goals].sum(0))
                     vs.append(v_est)
                     if v.shape[0] != 0:
-                        p = v.sigmoid()
-                        # p = v.sigmoid() * 0.99 + 0.01 / v.shape[0]
-                        loss += torch.log(p[action]).sum() * 10 * -(cumulative_r - v_est.detach())
+                        # p = v.sigmoid()
+                        p = v.sigmoid() * 0.99 + 0.01
+                        loss += torch.log(p[action]).sum() * -(cumulative_r - v_est.detach())
                         loss += (cumulative_r - v_est) ** 2
                         # loss = (p[~action].sum() - p[action].sum()) * cumulative_r
                         for i, act in enumerate(action):
@@ -356,6 +292,9 @@ if __name__ == '__main__':
                 for i in range(1, 10):
                     node_name = "DenyO(%d,1)" % i
                     print(node_name, ":", loss_cnt[node_name], loss_sum[node_name])
+                if timestamp % 50 == 0:
+                    torch.save(models.state_dict(), os.path.join(MODEL_DIR, "model-%s-%d.pth" % (args.analysis, timestamp)))
+                    torch.save(optimizer.state_dict(), os.path.join(MODEL_DIR, "optimizer-%s-%d.pth" % (args.analysis, timestamp)))
 
             print("iter:", it_sum / episode_per_epoch)
             print("reward:", reward_sum / episode_per_epoch)

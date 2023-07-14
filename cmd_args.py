@@ -19,10 +19,10 @@ parser.add_argument("--device", default="cpu",
 parser.add_argument("--latent-dim", type=int, default=32,
                     help="latent dimension of massage vector")
 parser.add_argument("--analysis", default="kcfa",
-                    choices=["kcfa", "kobj"],
+                    # choices=["kcfa", "kobj", "tiny", "tiny1"],
                     help="the analysis to run")
 parser.add_argument("--phase", default="pretrain",
-                    choices=["pretrain", "validate", "infer", "RL"],
+                    choices=["pretrain", "validate", "infer", "RL", "analysis"],
                     help="the analysis to run")
 parser.add_argument("--layer-dependent", action='store_true',
                     help="use layer (hop) dependent massage passing")
@@ -48,6 +48,16 @@ parser.add_argument("--hide-args", action='store_true',
 parser.add_argument("--activation", default="tanh",
                     choices=["tanh", "lrelu"],
                     help="activation function")
+parser.add_argument("--tanh2bug", action='store_true',
+                    help="fix the 2x tanh or not")
+parser.add_argument("--block", action='store_true',
+                    help="Use blocks to reduce memory costs.")
+parser.add_argument("--typedlinear", action='store_true',
+                    help="Use Typedlinear instead of Linear for feature updating.")
+parser.add_argument("--updatelinear", action='store_true',
+                    help="Use Linear instead of Linear + Linear for feature updating.")
+# parser.add_argument("--subset", type=int,
+#                     help="subset seed.")
 
 args = parser.parse_args()
 if not args.hide_args:
@@ -58,7 +68,10 @@ latent_dim = args.latent_dim
 analysis = args.analysis
 beta = args.beta
 epsilon = args.epsilon
-MODEL_DIR = "models"
+tanh2bug = args.tanh2bug
+typedlinear = args.typedlinear
+update_linear = args.updatelinear
+MODEL_DIR = "/data/zyyan/abstract/large_models"
 
 with open(os.path.join("data", analysis, "nodes_type_dict"), "r") as f:
     NODES_TYPE_DICT: Dict[str, int] = json.load(f)
@@ -66,4 +79,4 @@ with open(os.path.join("data", analysis, "nodes_type_dict"), "r") as f:
 
 with open(os.path.join("data", analysis, "edges_type_dict"), "r") as f:
     EDGES_TYPE_DICT: Dict[str, int] = json.load(f)
-    EDGES_TYPE_CNT = len(EDGES_TYPE_DICT)
+    EDGES_TYPE_CNT = EDGES_TYPE_DICT["last-base"]
