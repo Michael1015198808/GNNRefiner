@@ -10,6 +10,8 @@ parser = argparse.ArgumentParser(description="A naïve GNN-based abstraction ref
                                  formatter_class=argparse.ArgumentDefaultsHelpFormatter,
                                  allow_abbrev=False)
 
+parser.add_argument("--epochs", type=int, default=None,
+                    help="Total number of epochs for training.")
 parser.add_argument("--port", type=int, default=2021,
                     help="working port.")
 parser.add_argument("--work-dir", default=".",
@@ -22,7 +24,7 @@ parser.add_argument("--analysis", default="kcfa",
                     # choices=["kcfa", "kobj", "tiny", "tiny1"],
                     help="the analysis to run")
 parser.add_argument("--phase", default="pretrain",
-                    choices=["pretrain", "validate", "infer", "RL", "analysis"],
+                    choices=["pretrain", "validate", "infer", "infer-once", "RL", "analysis"],
                     help="the analysis to run")
 parser.add_argument("--layer-dependent", action='store_true',
                     help="use layer (hop) dependent massage passing")
@@ -33,6 +35,8 @@ graph_group.add_argument("--graphs", nargs="+", default=None,
                          help="derivation graphs used for pretrain or validation")
 graph_group.add_argument("--dumped-graphs",
                          help="Use dumped derivation set for pretrain or validation")
+graph_group.add_argument("--validate-graphs", nargs="+", default=None,
+                         help="derivation graphs used for validation during training.")
 parser.add_argument("--dump-graphs-to",
                     help="Dump validation set for further usage")
 parser.add_argument("--validate-models", nargs="+", default=None,

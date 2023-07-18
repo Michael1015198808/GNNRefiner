@@ -81,12 +81,13 @@ if __name__ == '__main__':
             torch.save(optimizer.state_dict(), os.path.join(MODEL_DIR, "optimizer-%s-0.pth" % args.analysis))
 
         print("torch's seed", torch.seed())
-        RLserver = socket(AF_INET, SOCK_DGRAM)
-        RLserver.bind(('', args.port))
-        print("ready")
-
         if args.phase == "infer":
-            flag = True
+            RLserver = socket(AF_INET, SOCK_DGRAM)
+            RLserver.bind(('', args.port))
+            print("ready")
+
+        if args.phase.startswith("infer"):
+            flag = (args.phase == "infer")
             for timestamp in count(1):
                 if flag:
                     raw_message, clientAddress = RLserver.recvfrom(2048)
@@ -94,11 +95,12 @@ if __name__ == '__main__':
                 flag = True
                 chosen = []
                 for it_count in count():
-                    raw_message, clientAddress = RLserver.recvfrom(2048)
-                    with open(os.path.join(args.work_dir, "address"), "w") as f:
-                        json.dump(clientAddress, f)
-                    message = raw_message.decode()
-                    if message == "SOLVING":
+                    if args.phase == "infer":
+                        raw_message, clientAddress = RLserver.recvfrom(2048)
+                        with open(os.path.join(args.work_dir, "address"), "w") as f:
+                            json.dump(clientAddress, f)
+                        message = raw_message.decode()
+                    if args.phase == "infer-once" or message == "SOLVING":
                         with torch.no_grad():
                             g = GraphPreprocessor(os.path.join(args.work_dir, "cons"),
                                                   os.path.join(args.work_dir, "goal"),

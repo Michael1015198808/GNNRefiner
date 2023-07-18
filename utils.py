@@ -12,55 +12,58 @@ from cmd_args import args, MODEL_DIR, beta
 from itertools import count
 import matplotlib.pyplot as plt
 
-def load_graphs() -> Tuple[List, List, List]:
-    if args.dumped_graphs:
-        import pickle
-        with open(args.dumped_graphs, "rb") as f:
-            return pickle.load(f)
-    else:
-        blocks_l = []
-        answers = []
-        invokes = []
-        for test_case in args.graphs:
-            g = GraphPreprocessor(join(test_case, "cons"),
-                                  join(test_case, "goal"),
-                                  join(test_case, "in"),
-                                  args.device,
-                                  test_case)
-            with open(join(test_case, "ans"), "r") as f:
-                answers.append([g.nodes_dict[line.strip()] for line in f])
-            if args.block:
-                # sampler = dgl.dataloading.MultiLayerNeighborSampler([None] * 10)
-                sampler = dgl.dataloading.MultiLayerFullNeighborSampler(12)
-                dataloader = dgl.dataloading.NodeDataLoader(g.g, g.invoke_sites, sampler, batch_size=10000)
-                for input_nodes, output_nodes, blocks in dataloader:
-                    blocks[0].graph_name = test_case
-                    del blocks[0].dstdata["t"]
-                    for block in blocks[1:]:
-                        del block.srcdata["t"]
-                        del block.dstdata["t"]
-                blocks_l.append(blocks)
-            else:
-                blocks_l.append(g)
-            invokes.append(g.invoke_sites)
-            log("graph %s loaded" % test_case)
+def load_graphs(graphs: List[str]) -> Tuple[List, List, List]:
+    assert args.dumped_graphs == None
+    blocks_l = []
+    answers = []
+    invokes = []
+    for test_case in graphs:
+        g = GraphPreprocessor(join(test_case, "cons"),
+                              join(test_case, "goal"),
+                              join(test_case, "in"),
+                              args.device,
+                              test_case)
+        with open(join(test_case, "ans"), "r") as f:
+            answers.append([g.nodes_dict[line.strip()] for line in f])
+        if args.block:
+            # sampler = dgl.dataloading.MultiLayerNeighborSampler([None] * 10)
+            sampler = dgl.dataloading.MultiLayerFullNeighborSampler(12)
+            dataloader = dgl.dataloading.NodeDataLoader(g.g, g.invoke_sites, sampler, batch_size=10000)
+            for input_nodes, output_nodes, blocks in dataloader:
+                blocks[0].graph_name = test_case
+                del blocks[0].dstdata["t"]
+                for block in blocks[1:]:
+                    del block.srcdata["t"]
+                    del block.dstdata["t"]
+            blocks_l.append(blocks)
+        else:
+            blocks_l.append(g)
+        invokes.append(g.invoke_sites)
+        log("graph %s loaded" % test_case)
 
-        if args.dump_graphs_to:
-            import pickle
-            with open(args.dump_graphs_to, "wb") as f:
-                pickle.dump((blocks_l, answers), f)
-            log("dump validation set to %s" % args.dump_graphs_to)
-        return blocks_l, invokes, answers
+    if args.dump_graphs_to:
+        import pickle
+        with open(args.dump_graphs_to, "wb") as f:
+            pickle.dump((blocks_l, answers), f)
+        log("dump validation set to %s" % args.dump_graphs_to)
+    return blocks_l, invokes, answers
 
 def pretrain(embedder, actor, optimizer, scheduler) -> None:
     import torch.utils.data
     log("Loading training data")
-    blocks_l, invokes, answers = load_graphs()
+    blocks_l, invokes, answers = load_graphs(args.graphs)
     log("Training data loaded")
+    if args.validate_graphs != None:
+        blocks_l_val, invokes_val, answers_val = load_graphs(args.validate_graphs)
 
     models = torch.nn.ModuleList([embedder, actor])
     loader = torch.utils.data.DataLoader(range(len(blocks_l)), 1, shuffle=True)
-    for epoch in count(scheduler.last_epoch + 1):
+
+    for epoch in (
+            count(scheduler.last_epoch + 1)
+        if args.epochs == None else
+            range(scheduler.last_epoch + 1, args.epochs + 1)
+    ):
         pos_probs = 0.0
         pos_cnt   = 0
         neg_probs = 0.0
@@ -108,6 +111,43 @@ def pretrain(embedder, actor, optimizer, scheduler) -> None:
         print("loss", loss)
 
         if True or epoch % 50 == 0:
+            if args.validate_graphs:
+                with torch.no_grad():
+                    for g, invoke_sites, answer in zip(blocks_l_val, invokes_val, answers_val):
+                        pos_probs = 0.0
+                        pos_cnt   = 0
+                        neg_probs = 0.0
+                        neg_cnt   = 0
+
+                        loss = 0.0
+                        print(g[0].graph_name if args.block else g.graph_name)
+                        graph_embedding = embedder(g)
+                        # [nodes, HIDDEN]
+                        if args.block:
+                            v = actor(graph_embedding).sigmoid()
+                        else:
+                            v = actor(graph_embedding[invoke_sites]).sigmoid()
+                        # [invoke_sites, 1]
+                        ans_tensor = torch.zeros_like(v, dtype=torch.float32)
+                        in_tuple_cnt = len(invoke_sites)
+                        weight = beta * (in_tuple_cnt - len(answer)) / len(answer)
+                        for ans in answer:
+                            answer_idx = invoke_sites.index(ans)
+                            ans_tensor[answer_idx] = 1.0
+                            pos_probs += v[answer_idx].item()
+
+                        pos_cnt += len(answer)
+                        neg_cnt += in_tuple_cnt - len(answer)
+                        neg_probs += v.sum()
+                        weight_tensor = (ans_tensor * weight) + 1
+                        loss += torch.nn.functional.binary_cross_entropy(v, ans_tensor, weight_tensor, reduction="sum")
+
+                    neg_probs -= pos_probs
+                    scheduler.step()
+                    print("VALIDATION average predict value of positive: %.4f" % (pos_probs / pos_cnt))
+                    print("VALIDATION average predict value of negative: %.4f" % (neg_probs / neg_cnt))
+                    print("VALIDATION loss", loss)
+                pass
             os.makedirs(MODEL_DIR, exist_ok=True)
             for obj, name in [
                     (models, 'model'),
@@ -119,7 +159,7 @@ def pretrain(embedder, actor, optimizer, scheduler) -> None:
 
 def validate(embedder, actor) -> None:
     log("Loading validate data")
-    blocks_l, invokes, answers = load_graphs()
+    blocks_l, invokes, answers = load_graphs(args.graphs)
     log("Validate data loaded")
 
     embedder.eval()
