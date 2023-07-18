@@ -1,4 +1,7 @@
 # The code is derived from https://github.com/github/gitignore/blob/master/Python.gitignore
+log/
+.vscode
+temp/
 
 # Project-wised
 # - Automatically dumped/generated
