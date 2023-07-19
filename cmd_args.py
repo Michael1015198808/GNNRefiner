@@ -16,6 +16,8 @@ parser.add_argument("--hide-args", action='store_true',
 parser.add_argument("--phase", default="pretrain",
                     choices=["pretrain", "validate", "infer", "infer-once", "RL", "analysis"],
                     help="the analysis to run")
+parser.add_argument("--seed", type=int,
+                    help="the random seed")
 
 net_group = parser.add_argument_group("Network hyperparameters")
 ml_group = parser.add_argument_group("Training configurations")

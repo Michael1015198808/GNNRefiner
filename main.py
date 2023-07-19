@@ -2,10 +2,11 @@ import resource
 
 # resource.setrlimit(resource.RLIMIT_AS, (1024 * 1024 * 1024 * 256, 1024 * 1024 * 1024 * 256))
 
+from itertools import count
 import json
 import pickle
-from itertools import count
 import os
+import random
 
 import numpy as np
 import torch
@@ -20,6 +21,11 @@ from socket import socket, AF_INET, SOCK_DGRAM
 from cmd_args import args, MODEL_DIR, EDGES_TYPE_DICT, EDGES_TYPE_CNT, latent_dim
 
 if __name__ == '__main__':
+    if args.seed:
+        random.seed(args.seed)
+        np.random.seed(args.seed)
+        torch.manual_seed(args.seed)
+        torch.cuda.manual_seed_all(args.seed)
     # networks
     embedder = Embedding(feature_cnt=NODES_TYPE_CNT + 2,
                          hidden_dim=latent_dim,
