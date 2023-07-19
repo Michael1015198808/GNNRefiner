@@ -10,7 +10,7 @@ import dgl
 from dgl.nn.pytorch import RelGraphConv, TypedLinear
 
 from typing import List
-from cmd_args import args, tanh2bug, typedlinear, NODES_TYPE_CNT
+from cmd_args import args, typedlinear, NODES_TYPE_CNT
 
 activation_dict = {
     "tanh": torch.tanh,
@@ -121,7 +121,7 @@ class Embedding(torch.nn.Module):
         # Message Passing
         if self.layer_dependent:
             for layer, block in zip(self.conv_passing, blocks):
-                if tanh2bug:
+                if args.tanh2bug:
                     x = activation(layer(block, x, block.edata["t"], is_block))
                 else:
                     x = layer(block, x, block.edata["t"], is_block, block.nodes_type)

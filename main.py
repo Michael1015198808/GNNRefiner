@@ -17,7 +17,7 @@ from processor import GraphPreprocessor, NODES_TYPE_CNT
 from network import Embedding
 from socket import socket, AF_INET, SOCK_DGRAM
 
-from cmd_args import args, MODEL_DIR, EDGES_TYPE_DICT, EDGES_TYPE_CNT, latent_dim, epsilon
+from cmd_args import args, MODEL_DIR, EDGES_TYPE_DICT, EDGES_TYPE_CNT, latent_dim
 
 if __name__ == '__main__':
     # networks
