@@ -55,6 +55,8 @@ ml_group.add_argument("--lr", "--learning-rate", type=float, default=1e-3,
                     help="learning rate of neural network")
 ml_group.add_argument("--model", default=None,
                     help="use pretrained model (support full path and relative path)")
+ml_group.add_argument("--model-dir", default="/data/zyyan/abstract/large_models",
+                    help="Location of saved models")
 ml_group.add_argument("--validate-models", nargs="+", default=None,
                     help="models used for validation")
 
@@ -82,7 +84,7 @@ latent_dim = args.latent_dim
 analysis = args.analysis
 beta = args.beta
 typedlinear = args.typedlinear
-MODEL_DIR = "/data/zyyan/abstract/large_models"
+MODEL_DIR = args.model_dir
 
 with open(os.path.join("data", analysis, "nodes_type_dict"), "r") as f:
     NODES_TYPE_DICT: Dict[str, int] = json.load(f)
