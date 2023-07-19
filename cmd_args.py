@@ -58,7 +58,10 @@ parser.add_argument("--block", action='store_true',
                     help="Use blocks to reduce memory costs.")
 parser.add_argument("--typedlinear", action='store_true',
                     help="Use Typedlinear instead of Linear for feature updating.")
-parser.add_argument("--updatelinear", action='store_true',
+update_option_group = parser.add_mutually_exclusive_group(required=False)
+update_option_group.add_argument("--update-2layer", action='store_true',
+                    help="Use vanilla 2-layer MLP instead of custom one for feature updating.")
+update_option_group.add_argument("--update-linear", action='store_true',
                     help="Use Linear instead of Linear + Linear for feature updating.")
 # parser.add_argument("--subset", type=int,
 #                     help="subset seed.")
@@ -74,7 +77,6 @@ beta = args.beta
 epsilon = args.epsilon
 tanh2bug = args.tanh2bug
 typedlinear = args.typedlinear
-update_linear = args.updatelinear
 MODEL_DIR = "/data/zyyan/abstract/large_models"
 
 with open(os.path.join("data", analysis, "nodes_type_dict"), "r") as f:

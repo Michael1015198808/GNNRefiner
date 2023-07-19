@@ -10,7 +10,7 @@ import dgl
 from dgl.nn.pytorch import RelGraphConv, TypedLinear
 
 from typing import List
-from cmd_args import args, tanh2bug, typedlinear, update_linear, NODES_TYPE_CNT
+from cmd_args import args, tanh2bug, typedlinear, NODES_TYPE_CNT
 
 activation_dict = {
     "tanh": torch.tanh,
@@ -22,16 +22,22 @@ class GCNConv(Module):
         super(GCNConv, self).__init__()
         self.passing = RelGraphConv(in_channels, out_channels, edges_type_cnt) # , low_mem=True)
         if typedlinear:
-            if update_linear:
+            if args.update_linear:
                 self.updating1 = TypedLinear(in_channels + hidden_channels, out_channels, num_types=NODES_TYPE_CNT)
                 self.updating2 = None
+            elif args.update_2layer:
+                self.updating1 = TypedLinear(in_channels + hidden_channels, 2 * hidden_channels, num_types=NODES_TYPE_CNT)
+                self.updating2 = TypedLinear(2 * hidden_channels, out_channels, num_types=NODES_TYPE_CNT)
             else:
                 self.updating1 = TypedLinear(in_channels + hidden_channels, 2 * hidden_channels, num_types=NODES_TYPE_CNT)
                 self.updating2 = TypedLinear(in_channels + 2 * hidden_channels, out_channels, num_types=NODES_TYPE_CNT)
         else:
-            if update_linear:
+            if args.update_linear:
                 self.updating1 = Linear(in_channels + hidden_channels, out_channels)
                 self.updating2 = None
+            elif args.update_2layer:
+                self.updating1 = Linear(in_channels + hidden_channels, 2 * hidden_channels)
+                self.updating2 = Linear(2 * hidden_channels, out_channels)
             else:
                 self.updating1 = Linear(in_channels + hidden_channels, 2 * hidden_channels)
                 self.updating2 = Linear(in_channels + 2 * hidden_channels, out_channels)
@@ -50,19 +56,25 @@ class GCNConv(Module):
         if typedlinear:
             # mid has shape [nodes, HIDDEN]
             mid = activation(self.updating1(torch.cat([dst_x, msg], dim=1), nodes_type))
-            if update_linear:
+            if args.update_linear:
                 return mid
 
             # Updating nodes' states using previous states(x) and current messages(mid).
-            return activation(self.updating2(torch.cat([dst_x, mid], dim=1), nodes_type))
+            if args.update_2layer:
+                return activation(self.updating2(mid, nodes_type))
+            else:
+                return activation(self.updating2(torch.cat([dst_x, mid], dim=1), nodes_type))
         else:
             # mid has shape [nodes, HIDDEN]
             mid = activation(self.updating1(torch.cat([dst_x, msg], dim=1)))
-            if update_linear:
+            if args.update_linear:
                 return mid
 
             # Updating nodes' states using previous states(x) and current messages(mid).
-            return activation(self.updating2(torch.cat([dst_x, mid], dim=1)))
+            if args.update_2layer:
+                return activation(self.updating2(mid))
+            else:
+                return activation(self.updating2(torch.cat([dst_x, mid], dim=1)))
 
 
 
