@@ -53,8 +53,11 @@ if __name__ == '__main__':
             checkpoint = torch.load(args.model.replace("model-", "optimizer-"))
             optimizer.load_state_dict(checkpoint)
 
-            # checkpoint = torch.load(args.model.replace("model-", "scheduler-"))
-            # scheduler.load_state_dict(checkpoint)
+            checkpoint = torch.load(args.model.replace("model-", "scheduler-"))
+            scheduler.load_state_dict(checkpoint)
+
+            print("optimizer & scheduler are also founded.")
+
         print("pretrain started")
         pretrain(embedder, actor, optimizer, scheduler)
         print("pretrain finished")
