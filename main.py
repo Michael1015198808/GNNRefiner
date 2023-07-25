@@ -100,7 +100,9 @@ if __name__ == '__main__':
             for timestamp in count(1):
                 if flag:
                     raw_message, clientAddress = RLserver.recvfrom(2048)
-                    assert raw_message.decode() == "STARTING", f"received {raw_message.decode()}, expect \"STARTING\""
+                    message = raw_message.decode()
+                    assert message.split()[0] == "STARTING", f"received {raw_message.decode()}, expect \"STARTING <workdir>\""
+                    print(message)
                 flag = True
                 chosen = []
                 for it_count in count():
@@ -136,6 +138,7 @@ if __name__ == '__main__':
                                 chosen.append(s)
 
                             RLserver.sendto("SOLVED".encode(), clientAddress)
+                            del g, graph_embedding, v, action
                     elif message == "STARTING":
                         flag = False
                         break
