@@ -36,6 +36,8 @@ net_group.add_argument("--tanh2bug", action='store_true',
                     help="Enable this option to use a previous buggy version that calls activation function twice")
 net_group.add_argument("--typedlinear", action='store_true',
                     help="Use Typedlinear instead of Linear for feature updating.")
+net_group.add_argument("--skip-connection", action='store_true',
+                    help="Use skip connection between layers.")
 
 update_option_group = net_group.add_mutually_exclusive_group(required=False)
 update_option_group.add_argument("--update-2layer", action='store_true',

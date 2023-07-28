@@ -43,6 +43,11 @@ class GCNConv(Module):
                 self.updating2 = Linear(in_channels + 2 * hidden_channels, out_channels)
 
     def forward(self, block, x, edges_type, is_block, nodes_type):
+        if args.skip_connection:
+            return x + self.forward_impl(block, x, edges_type, is_block, nodes_type)
+        else:
+            return self.forward_impl(block, x, edges_type, is_block, nodes_type)
+    def forward_impl(self, block, x, edges_type, is_block, nodes_type):
         # x has shape [nodes, HIDDEN]
         # edge_index has shape [2, E]
 
