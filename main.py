@@ -46,17 +46,21 @@ if __name__ == '__main__':
         exit(0)
     elif args.phase == "pretrain":
         if args.model:
-            checkpoint = torch.load(args.model)
             print("Pretrained model file found. Start with pretrained model")
+            checkpoint = torch.load(args.model)
             models.load_state_dict(checkpoint)
 
-            checkpoint = torch.load(args.model.replace("model-", "optimizer-"))
-            optimizer.load_state_dict(checkpoint)
-
-            checkpoint = torch.load(args.model.replace("model-", "scheduler-"))
-            scheduler.load_state_dict(checkpoint)
-
-            print("optimizer & scheduler are also founded.")
+            try:
+                optimizer.load_state_dict(
+                    torch.load(args.model.replace("model-", "optimizer-"))
+                )
+                scheduler.load_state_dict(
+                    torch.load(args.model.replace("model-", "scheduler-"))
+                )
+            except FileNotFoundError:
+                print("optimizer or scheduler not founded!")
+            else:
+                print("optimizer & scheduler are also founded.")
 
         print("pretrain started")
         pretrain(embedder, actor, optimizer, scheduler)
