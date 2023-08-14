@@ -52,7 +52,7 @@ class GCNConv(Module):
         # edge_index has shape [2, E]
 
         # Calculate massage to pass
-        msg = activation(self.passing(block, x, edges_type))
+        msg = activation(self.passing(block, x, edges_type, presorted=True))
         if is_block:
             dst_x = x[block.dstnodes()]
         else:

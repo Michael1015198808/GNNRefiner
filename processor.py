@@ -10,11 +10,10 @@ class GraphPreprocessor:
         self.graph_name = graph_name
         nodes_cnt = 0
         self.nodes_name: List[str] = []
-        edges_type: List[int] = []
         self.nodes_dict:Dict[str, int] = {}
 
-        p: List[int] = []
-        q: List[int] = []
+        p: List[int] = [[] for _ in range(EDGES_TYPE_CNT)]
+        q: List[int] = [[] for _ in range(EDGES_TYPE_CNT)]
 
         cons = []
         with open(cons_name.replace("cons", "tuple"), 'r') as f:
@@ -58,18 +57,26 @@ class GraphPreprocessor:
                 type_base = EDGES_TYPE_DICT[s]
                 for i, tail in enumerate(tails):
                     tail_idx = self.nodes_dict[tail]
-                    p.append(tail_idx)
-                    q.append(head_idx)
-                    edges_type.append(type_base + i)
-                    p.append(head_idx)
-                    q.append(tail_idx)
-                    edges_type.append(type_base + len(tails) + i)
+                    p[type_base + i].append(tail_idx)
+                    q[type_base + i].append(head_idx)
+                    p[type_base + len(tails) + i].append(head_idx)
+                    q[type_base + len(tails) + i].append(tail_idx)
 
-        self.g = dgl.graph((p, q), num_nodes=nodes_cnt, device=device)
+        self.g = dgl.graph(([ x
+            for l in p
+            for x in l
+        ], [ x
+            for l in q
+            for x in l
+        ]), num_nodes=nodes_cnt, device=device)
 
         self.g.ndata["t"] = nodes_fea
         self.g.nodes_type = nodes_type
-        self.g.edata["t"] = torch.tensor(edges_type, device=device)
+        self.g.edata["t"] = torch.tensor([
+            idx
+            for idx, lst in enumerate(p)
+            for _ in lst
+        ], device=device)
 
         # self.edata["t"] = self.g.edata["t"] = None
 
