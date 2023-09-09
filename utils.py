@@ -97,7 +97,8 @@ def pretrain(embedder, actor, optimizer, scheduler) -> None:
             neg_cnt += in_tuple_cnt - len(answer)
             neg_probs += v.sum()
             weight_tensor = (ans_tensor * weight) + 1
-            output += torch.nn.functional.binary_cross_entropy(v, ans_tensor, weight_tensor, reduction="sum")
+            # output += torch.nn.functional.binary_cross_entropy(v, ans_tensor, weight_tensor, reduction="sum")
+            output += (weight_tensor * (v - ans_tensor) ** 2).sum()
 
           optimizer.zero_grad()
           output.backward()
