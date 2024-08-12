@@ -1,12 +1,11 @@
-import resource
-
-# resource.setrlimit(resource.RLIMIT_AS, (1024 * 1024 * 1024 * 256, 1024 * 1024 * 1024 * 256))
-
+import datetime
+import psutil
 from itertools import count
 import json
-import pickle
 import os
+import pickle
 import random
+import time
 
 import numpy as np
 import torch
@@ -37,6 +36,11 @@ if __name__ == '__main__':
             nn.Linear(2 * latent_dim, 1),
             ).to(args.device)
     models = nn.ModuleList([embedder, actor])
+    if args.threads != None:
+        torch.set_num_threads(args.threads)
+    if args.interop_threads != None:
+        torch.set_num_interop_threads(args.interop_threads)
+    print(f"{torch.get_num_threads() = }, {torch.get_num_interop_threads() = }")
     optimizer = torch.optim.Adam(models.parameters(), lr=args.lr, weight_decay=5e-4) #, momentum=0.5)
     scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer, gamma=0.9995)
     os.makedirs(MODEL_DIR, exist_ok=True)
@@ -95,6 +99,8 @@ if __name__ == '__main__':
 
         print("torch's seed", torch.seed())
         if args.phase == "infer":
+            # import resource
+            # resource.setrlimit(resource.RLIMIT_AS, (1024 * 1024 * 1024 * 256, 1024 * 1024 * 1024 * 256))
             RLserver = socket(AF_INET, SOCK_DGRAM)
             RLserver.bind(('', args.port))
             print("ready")
@@ -116,16 +122,19 @@ if __name__ == '__main__':
                             json.dump(clientAddress, f)
                         message = raw_message.decode()
                     if args.phase == "infer-once" or message == "SOLVING":
+                        # while psutil.virtual_memory().percent > 30:
+                        #     print(datetime.datetime.now(), "Memory usage over 30%!")
+                        #     time.sleep(600)
                         with torch.no_grad():
                             g = GraphPreprocessor(os.path.join(args.work_dir, "cons"),
                                                   os.path.join(args.work_dir, "goal"),
                                                   os.path.join(args.work_dir, "in"),
                                                   args.device)
                             print(g.g.num_nodes())
-                            if g.g.num_nodes() > 80_000_000:
-                                print("Graph too large!")
-                                RLserver.sendto("CLOSED".encode(), clientAddress)
-                                break
+                            # if g.g.num_nodes() > 80_000_000:
+                            #     print("Graph too large!")
+                            #     RLserver.sendto("CLOSED".encode(), clientAddress)
+                            #     break
                             graph_embedding = embedder(g.g)
                             v = actor(graph_embedding[g.invoke_sites]).reshape(-1).sigmoid()
                             print(v.mean(), v.min(), v.max())
@@ -143,12 +152,13 @@ if __name__ == '__main__':
 
                             RLserver.sendto("SOLVED".encode(), clientAddress)
                             del g, graph_embedding, v, action
-                    elif message == "STARTING":
+                    elif message.startswith("STARTING"):
+                        print(message)
                         flag = False
                         break
                     else:
                         print(message)
-                        assert message == "FINISHED"
+                        assert message == "FINISHED", f"received {raw_message.decode()}, expect \"FINISHED\""
                         break
                 for idx, s in enumerate(chosen):
                     print(idx, len(s), len(s.union(chosen[0])))

@@ -18,6 +18,10 @@ parser.add_argument("--phase", default="pretrain",
                     help="the analysis to run")
 parser.add_argument("--seed", type=int,
                     help="the random seed")
+parser.add_argument("--threads", type=int,
+                    help="The argument of torch.set_num_threads()")
+parser.add_argument("--interop-threads", type=int,
+                    help="The argument of torch.set_num_interop_threads()")
 
 net_group = parser.add_argument_group("Network hyperparameters")
 ml_group = parser.add_argument_group("Training configurations")
